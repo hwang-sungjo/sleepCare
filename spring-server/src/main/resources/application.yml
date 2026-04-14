@@ -2,6 +2,7 @@ spring:
   profiles:
     group:
       "local": "localDB, devPort, secret, web-mvc"
+      "local-h2": "localh2DB, devPort, secret, web-mvc"
       "dev": "devDB, devPort, secret, web-mvc"
       "prod": "prodDB, prodPort, secret, web-mvc"
 
@@ -23,6 +24,23 @@ spring:
     init:
       platform: mysql
 
+---
+
+spring:
+  config:
+    activate:
+      on-profile: "localh2DB"
+
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MYSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: ${DATASOURCE_USERNAME}
+    password: ${DATASOURCE_PASSWORD}
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
 ---
 
 spring:

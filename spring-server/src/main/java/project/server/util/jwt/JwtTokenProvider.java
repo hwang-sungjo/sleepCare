@@ -13,9 +13,17 @@ import org.springframework.stereotype.Component;
 import static project.server.common.response.status.BaseExceptionResponseStatus.*;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Date;
 
 import javax.crypto.SecretKey;
+
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.util.StringUtils;
 
 @Slf4j
 @Component
@@ -48,7 +56,7 @@ public class JwtTokenProvider {
     public boolean isExpiredToken(String token) throws JwtInvalidTokenException {
         try {
             Jws<Claims> claims = Jwts.parserBuilder()
-                    .setSigningKey(JWT_SECRET_KEY).build()
+                    .setSigningKey(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8)).build()
                     .parseClaimsJws(token);
             return claims.getBody().getExpiration().before(new Date());
 
@@ -69,9 +77,31 @@ public class JwtTokenProvider {
 
     public String getPrincipal(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(JWT_SECRET_KEY).build()
+                .setSigningKey(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8)).build()
                 .parseClaimsJws(token)
                 .getBody().getSubject();
+    }
+
+    public String resolveToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            return !isExpiredToken(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public Authentication getAuthentication(String token) {
+        String principal = getPrincipal(token);
+        UserDetails userDetails = User.withUsername(principal).password("").authorities(Collections.emptyList()).build();
+        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }
 
 }

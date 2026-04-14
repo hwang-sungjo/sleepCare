@@ -44,6 +44,9 @@ dependencies {
 	// .env
 	implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 
+	// H2
+	runtimeOnly 'com.h2database:h2'
+
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
