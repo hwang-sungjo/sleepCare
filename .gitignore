@@ -1,0 +1,26 @@
+# Security and Environment
+.env
+*.pem
+
+# IDE - Visual Studio Code
+.vscode/
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Gradle and Build Output
+.gradle/
+build/
+spring-server/.gradle/
+spring-server/build/
+
+# Keep Gradle Wrapper jar
+!**/gradle/wrapper/gradle-wrapper.jar
+
+# System Files
+.DS_Store
+Thumbs.db
