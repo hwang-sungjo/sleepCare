@@ -21,6 +21,11 @@ spring-server/build/
 # Keep Gradle Wrapper jar
 !**/gradle/wrapper/gradle-wrapper.jar
 
+# Frontend
+node_modules/
+dist/
+.cache/
+
 # System Files
 .DS_Store
 Thumbs.db
