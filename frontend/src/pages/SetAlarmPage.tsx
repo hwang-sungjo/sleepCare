@@ -36,7 +36,7 @@ const SetAlarmPage: React.FC<SetAlarmPageProps> = ({
                 />
                 <div className="mt-6 flex gap-2">
                     {['월', '화', '수', '목', '금'].map((day) => (
-                        <span key={day} className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold">
+                        <span key={day} className="w-8 h-8 rounded-full bg-indigo-600/50 flex items-center justify-center text-xs font-bold text-indigo-200">
                             {day}
                         </span>
                     ))}
@@ -46,6 +46,7 @@ const SetAlarmPage: React.FC<SetAlarmPageProps> = ({
                         </span>
                     ))}
                 </div>
+                <p className="mt-2 text-xs text-slate-600">요일별 반복 설정은 추후 업데이트 예정입니다</p>
             </div>
 
             <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/5">

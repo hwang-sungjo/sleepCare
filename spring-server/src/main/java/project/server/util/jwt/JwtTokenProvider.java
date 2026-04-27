@@ -36,7 +36,6 @@ public class JwtTokenProvider {
     private long JWT_EXPIRED_IN;
 
     public String createToken(String principal, long userId) {
-        log.info("JWT key={}", JWT_SECRET_KEY);
 
         Claims claims = Jwts.claims().setSubject(principal);
         Date now = new Date();
