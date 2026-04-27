@@ -5,34 +5,78 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import HomePage from './pages/HomePage';
 import SetAlarmPage from './pages/SetAlarmPage';
+import { login as apiLogin, signup as apiSignup } from './api/auth';
+import { upsertAlarm as apiUpsertAlarm } from './api/alarm';
+import { ApiError, clearToken, setToken } from './api/client';
 
 export default function App() {
     const [page, setPage] = useState<PageName>('login');
     const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
+    const [userName, setUserName] = useState('');
     const [alarmTime, setAlarmTime] = useState('07:30');
     const { notification, showNotification } = useNotification();
 
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (userId && password) {
-            setPage('home');
-            showNotification('로그인에 성공했습니다.');
+    const showError = (e: unknown, fallback: string) => {
+        if (e instanceof ApiError) {
+            showNotification(e.message);
         } else {
-            showNotification('아이디와 비밀번호를 입력해주세요.');
+            showNotification(fallback);
         }
     };
 
-    const handleSignup = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        showNotification('회원가입이 완료되었습니다.');
-        setPage('login');
+        if (!userId || !password) {
+            showNotification('아이디와 비밀번호를 입력해주세요.');
+            return;
+        }
+        try {
+            const res = await apiLogin(userId, password);
+            setToken(res.token);
+            setUserName(res.userName);
+            setPage('home');
+            showNotification('로그인에 성공했습니다.');
+        } catch (err) {
+            showError(err, '로그인 중 오류가 발생했습니다.');
+        }
     };
 
-    const handleSetAlarm = (e: React.FormEvent) => {
+    const handleSignup = async (signupUserId: string, signupPassword: string, signupPasswordConfirm: string) => {
+        if (!signupUserId || !signupPassword) {
+            showNotification('아이디와 비밀번호를 입력해주세요.');
+            return;
+        }
+        if (signupPassword !== signupPasswordConfirm) {
+            showNotification('비밀번호가 일치하지 않습니다.');
+            return;
+        }
+        try {
+            await apiSignup(signupUserId, signupPassword);
+            showNotification('회원가입이 완료되었습니다. 로그인 해주세요.');
+            setPage('login');
+        } catch (err) {
+            showError(err, '회원가입 중 오류가 발생했습니다.');
+        }
+    };
+
+    const handleSetAlarm = async (e: React.FormEvent) => {
         e.preventDefault();
-        showNotification('알람이 성공적으로 설정되었습니다.');
-        setPage('home');
+        try {
+            const res = await apiUpsertAlarm(alarmTime);
+            showNotification(res.message);
+            setPage('home');
+        } catch (err) {
+            showError(err, '알람 설정 중 오류가 발생했습니다.');
+        }
+    };
+
+    const handleLogout = () => {
+        clearToken();
+        setUserId('');
+        setPassword('');
+        setUserName('');
+        setPage('login');
     };
 
     switch (page) {
@@ -59,9 +103,10 @@ export default function App() {
         case 'home':
             return (
                 <HomePage
-                    alarmTime={alarmTime}
+                    userName={userName}
                     notification={notification}
                     onNavigate={setPage}
+                    onLogout={handleLogout}
                 />
             );
         case 'setAlarm':
