@@ -28,7 +28,6 @@ public class FitbitDataEntity {
     private Long fitbitDataId;
 
     private Long userId;
-    private Instant loggedAt;
     private Instant segmentStart;
     private Instant segmentEnd;
     private String sleepStage;
@@ -38,5 +37,7 @@ public class FitbitDataEntity {
 
     private Integer restingHrBpm;
     private String payloadJson;
+    private Instant createdAt;
+    private Instant updatedAt;
 
 }

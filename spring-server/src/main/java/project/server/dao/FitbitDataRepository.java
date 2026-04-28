@@ -12,8 +12,8 @@ public interface FitbitDataRepository extends JpaRepository<FitbitDataEntity, Lo
 
     long countByUserId(long userId);
 
-    List<FitbitDataEntity> findByUserIdAndLoggedAtBetweenOrderByLoggedAtAsc(
+    List<FitbitDataEntity> findByUserIdAndSegmentStartBetweenOrderBySegmentStartAsc(
             Long userId, Instant fromInclusive, Instant toInclusive);
 
-    List<FitbitDataEntity> findByUserIdOrderByLoggedAtDesc(long userId, Pageable pageable);
+    List<FitbitDataEntity> findByUserIdOrderByCreatedAtDesc(long userId, Pageable pageable);
 }

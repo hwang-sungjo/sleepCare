@@ -39,7 +39,7 @@ public class DashboardService {
     }
 
     private String environmentHint(long userId) {
-        var page = sensorDataRepository.findByUserIdOrderByRecordedAtDesc(userId, PageRequest.of(0, 12));
+        var page = sensorDataRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, 12));
         if (page.isEmpty()) {
             return "실내 데이터가 아직 충분하지 않습니다.";
         }

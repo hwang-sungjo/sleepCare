@@ -9,5 +9,5 @@ import java.util.List;
 
 public interface SensorDataRepository extends JpaRepository<SensorDataEntity, Long> {
 
-    List<SensorDataEntity> findByUserIdOrderByRecordedAtDesc(long userId, Pageable pageable);
+    List<SensorDataEntity> findByUserIdOrderByCreatedAtDesc(long userId, Pageable pageable);
 }

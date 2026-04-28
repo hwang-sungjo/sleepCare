@@ -27,16 +27,16 @@ public class AuthService {
     public LoginResponse login(LoginRequest authRequest) {
         log.info("[AuthService.login]");
 
-        String email = authRequest.getEmail();
+        String loginId = authRequest.getUserId();
 
         long userId = userRepository
-                .findByEmailAndStatus(email, "active")
+                .findByNickname(loginId)
                 .map(UserEntity::getUserId)
                 .orElseThrow(() -> new UserException(EMAIL_NOT_FOUND));
 
         validatePassword(authRequest.getPassword(), userId);
 
-        String updatedJwt = jwtTokenProvider.createToken(email, userId);
+        String updatedJwt = jwtTokenProvider.createToken(loginId, userId);
 
         return new LoginResponse(userId, updatedJwt);
     }
@@ -52,7 +52,7 @@ public class AuthService {
 
     public long getUserIdByEmail(String email) {
         return userRepository
-                .findByEmailAndStatus(email, "active")
+                .findByNickname(email)
                 .map(UserEntity::getUserId)
                 .orElseThrow(() -> new JwtUnauthorizedTokenException(TOKEN_MISMATCH));
     }

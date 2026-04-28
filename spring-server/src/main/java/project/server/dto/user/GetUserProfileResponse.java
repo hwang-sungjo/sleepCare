@@ -9,9 +9,5 @@ import lombok.Getter;
 @AllArgsConstructor
 public class GetUserProfileResponse {
 
-    private String email;
     private String nickname;
-    private String phoneNumber;
-    private String profileImage;
-    private String status;
 }

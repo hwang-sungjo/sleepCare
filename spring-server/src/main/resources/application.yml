@@ -2,7 +2,6 @@ spring:
   profiles:
     group:
       "local": "localDB, devPort, secret, web-mvc"
-      "local-h2": "localh2DB, devPort, secret, web-mvc"
       "dev": "devDB, devPort, secret, web-mvc"
       "prod": "prodDB, prodPort, secret, web-mvc"
 
@@ -25,27 +24,6 @@ spring:
       platform: mysql
       mode: always
 
----
-
-spring:
-  config:
-    activate:
-      on-profile: "localh2DB"
-
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=MYSQL;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-
-  sql:
-    init:
-      mode: always
 ---
 
 spring:
@@ -142,9 +120,5 @@ spring:
     basename: errors
 
 app:
-  fitbit-client-id: ${FITBIT_CLIENT_ID:}
-  fitbit-client-secret: ${FITBIT_CLIENT_SECRET:}
-  fitbit-callback-uri: ${FITBIT_CALLBACK_URI:http://localhost:9000/fitbit/callback}
-  fitbit-sync-cron: ${FITBIT_SYNC_CRON:0 0 6 * * ?}
-  sensor-api-key: ${SENSOR_API_KEY:}
+  frontend-origin: ${FRONTEND_ORIGIN:*}
 

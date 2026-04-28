@@ -32,5 +32,7 @@ public class AlarmEntity {
     private Instant dynamicWakeAt;
     private Boolean adaptiveEnabled;
     private Integer windowMinutesBefore;
+    private Instant createdAt;
+    private Instant updatedAt;
 
 }

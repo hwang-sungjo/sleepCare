@@ -34,7 +34,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    @Profile({ "local-h2", "local", "dev" })
+    @Profile({ "local", "dev" })
     public SecurityFilterChain devFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
@@ -62,14 +62,13 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()
-                        .requestMatchers("/sensors/**").permitAll()
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/index.html")
-                                .permitAll()
+                        .permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
 

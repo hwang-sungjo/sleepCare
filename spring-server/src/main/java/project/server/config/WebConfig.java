@@ -3,7 +3,6 @@ package project.server.config;
 import lombok.RequiredArgsConstructor;
 import project.server.common.argument_resolver.JwtAuthHandlerArgumentResolver;
 import project.server.common.interceptor.JwtAuthInterceptor;
-import project.server.common.interceptor.SensorApiKeyInterceptor;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -26,24 +25,17 @@ public class WebConfig implements WebMvcConfigurer {
                 .maxAge(3600);
     }
 
-    private final SensorApiKeyInterceptor sensorApiKeyInterceptor;
     private final JwtAuthInterceptor jwtAuthenticationInterceptor;
     private final JwtAuthHandlerArgumentResolver jwtAuthHandlerArgumentResolver;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(sensorApiKeyInterceptor)
-                .order(0)
-                .addPathPatterns("/sensors/**");
-
         registry.addInterceptor(jwtAuthenticationInterceptor)
-                .order(1)
+                .order(0)
                 .addPathPatterns(
                         "/alarms/**",
                         "/dashboard/**",
-                        "/users/me/**",
-                        "/fitbit/**",
-                        "/auth/test");
+                        "/users/me/**");
     }
 
     @Override

@@ -1,8 +1,6 @@
 package project.server.dao.entity;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -19,16 +17,17 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "`user`")
-public class UserEntity {
+@Table(name = "fitbit")
+public class FitbitEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long userId;
+    private String fitbitUserId;
 
-    private String password;
-    private String nickname;
+    private Long userId;
+    private String fitbitUserPassword;
+    private String fitbitAccessToken;
+    private String fitbitRefreshToken;
+    private LocalDateTime fitbitTokenExpiresAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
 }

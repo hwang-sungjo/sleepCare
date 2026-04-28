@@ -49,7 +49,7 @@ public class DynamicAlarmService {
         int windowMinutes = Objects.requireNonNullElse(alarm.getWindowMinutesBefore(), 30);
         Instant windowStart = windowEnd.minus(windowMinutes, ChronoUnit.MINUTES);
 
-        List<FitbitDataEntity> slices = fitbitDataRepository.findByUserIdAndLoggedAtBetweenOrderByLoggedAtAsc(
+        List<FitbitDataEntity> slices = fitbitDataRepository.findByUserIdAndSegmentStartBetweenOrderBySegmentStartAsc(
                 userId, windowStart, windowEnd.plus(1, ChronoUnit.MINUTES));
 
         Instant chosenInstant = slices.stream()
@@ -83,7 +83,10 @@ public class DynamicAlarmService {
         if (!isShallow(stage)) {
             return null;
         }
-        Instant t = Objects.requireNonNullElse(row.getSegmentStart(), row.getLoggedAt());
+        Instant t = row.getSegmentStart();
+        if (t == null) {
+            return null;
+        }
         if (t.isBefore(windowStart) || t.isAfter(windowEnd)) {
             return null;
         }

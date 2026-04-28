@@ -19,7 +19,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "sensor_data")
+@Table(name = "sensor")
 public class SensorDataEntity {
 
     @Id
@@ -27,10 +27,10 @@ public class SensorDataEntity {
     private Long sensorDataId;
 
     private Long userId;
-    private String deviceId;
-    private Instant recordedAt;
     private Double illuminance;
     private Double temperature;
     private Double humidity;
+    private Instant createdAt;
+    private Instant updatedAt;
 
 }
