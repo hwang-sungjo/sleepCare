@@ -2,8 +2,6 @@ package project.server.common.exception_handler;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
-import project.server.common.exception.BadRequestException;
-import project.server.common.exception.InternalServerErrorException;
 import project.server.common.response.BaseErrorResponse;
 
 import static project.server.common.response.status.BaseExceptionResponseStatus.*;
@@ -21,23 +19,11 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 public class BaseExceptionControllerAdvice {
 
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    @ExceptionHandler({ BadRequestException.class, NoHandlerFoundException.class, TypeMismatchException.class })
+    @ExceptionHandler({ NoHandlerFoundException.class, TypeMismatchException.class })
     public BaseErrorResponse handle_BadRequest(Exception e) {
         log.error("[handle_BadRequest]", e);
         return new BaseErrorResponse(URL_NOT_FOUND);
     }
-
-    // 위와 동일 (return ResponseEntity<>)
-    /*
-     * @ExceptionHandler({BadRequestException.class, NoHandlerFoundException.class,
-     * TypeMismatchException.class, HttpRequestMethodNotSupportedException.class})
-     * public ResponseEntity<BaseErrorResponse>
-     * handle_BadRequest(BadRequestException e) {
-     * log.error("[handle_BadRequest]", e);
-     * return ResponseEntity.badRequest().body(new
-     * BaseErrorResponse(e.getExceptionStatus()));
-     * }
-     */
 
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
@@ -51,13 +37,6 @@ public class BaseExceptionControllerAdvice {
     public BaseErrorResponse handle_ConstraintViolationException(ConstraintViolationException e) {
         log.error("[handle_ConstraintViolationException]", e);
         return new BaseErrorResponse(BAD_REQUEST, e.getMessage());
-    }
-
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    @ExceptionHandler(InternalServerErrorException.class)
-    public BaseErrorResponse handle_InternalServerError(InternalServerErrorException e) {
-        log.error("[handle_InternalServerError]", e);
-        return new BaseErrorResponse(e.getExceptionStatus());
     }
 
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)

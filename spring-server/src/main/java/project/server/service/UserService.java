@@ -2,10 +2,13 @@ package project.server.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import project.server.common.exception.DatabaseException;
 import project.server.common.exception.UserException;
-import project.server.dao.UserDao;
+import project.server.dao.AlarmRepository;
+import project.server.dao.UserRepository;
+import project.server.dao.entity.AlarmEntity;
+import project.server.dao.entity.UserEntity;
 import project.server.dto.user.*;
+
 import project.server.util.jwt.JwtTokenProvider;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -13,79 +16,61 @@ import org.springframework.stereotype.Service;
 
 import static project.server.common.response.status.BaseExceptionResponseStatus.*;
 
-import java.util.List;
+import java.time.LocalTime;
+import java.util.stream.IntStream;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
-    private final UserDao userDao;
+    private final UserRepository userRepository;
+    private final AlarmRepository alarmRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
     public PostUserResponse signUp(PostUserRequest postUserRequest) {
-        log.info("[UserService.createUser]");
+        log.info("[UserService.signUp]");
 
-        validateEmail(postUserRequest.getEmail());
-        String nickname = postUserRequest.getNickname();
-        if (nickname != null) {
-            validateNickname(postUserRequest.getNickname());
-        }
-
+        String nickname = postUserRequest.getNickname().trim();
+        validateNickname(nickname);
         String encodedPassword = passwordEncoder.encode(postUserRequest.getPassword());
         postUserRequest.resetPassword(encodedPassword);
 
-        long userId = userDao.createUser(postUserRequest);
+        UserEntity user = UserEntity.builder()
+                .password(postUserRequest.getPassword())
+                .nickname(nickname)
+                .build();
 
-        String jwt = jwtTokenProvider.createToken(postUserRequest.getEmail(), userId);
+        UserEntity saved = userRepository.save(user);
+        IntStream.rangeClosed(1, 7).forEach(day ->
+                alarmRepository.save(
+                        AlarmEntity.builder()
+                                .userId(saved.getUserId())
+                                .dayOfWeek(day)
+                                .baseWakeTime(LocalTime.of(7, 30))
+                                .dynamicWakeAt(null)
+                                .adaptiveEnabled(true)
+                                .windowMinutesBefore(30)
+                                .build()));
 
-        return new PostUserResponse(userId, jwt);
+        String jwt = jwtTokenProvider.createToken(nickname, saved.getUserId());
+
+        return new PostUserResponse(saved.getUserId(), jwt);
     }
 
-    public void modifyUserStatus_dormant(long userId) {
-        log.info("[UserService.modifyUserStatus_dormant]");
-
-        int affectedRows = userDao.modifyUserStatus_dormant(userId);
-        if (affectedRows != 1) {
-            throw new DatabaseException(DATABASE_ERROR);
-        }
-    }
-
-    public void modifyUserStatus_deleted(long userId) {
-        log.info("[UserService.modifyUserStatus_deleted]");
-
-        int affectedRows = userDao.modifyUserStatus_deleted(userId);
-        if (affectedRows != 1) {
-            throw new DatabaseException(DATABASE_ERROR);
-        }
-    }
-
-    public void modifyNickname(long userId, String nickname) {
-        log.info("[UserService.modifyNickname]");
-
-        validateNickname(nickname);
-        int affectedRows = userDao.modifyNickname(userId, nickname);
-        if (affectedRows != 1) {
-            throw new DatabaseException(DATABASE_ERROR);
-        }
-    }
-
-    public List<GetUserResponse> getUsers(String nickname, String email, String status) {
-        log.info("[UserService.getUsers]");
-        return userDao.getUsers(nickname, email, status);
-    }
-
-    private void validateEmail(String email) {
-        if (userDao.hasDuplicateEmail(email)) {
-            throw new UserException(DUPLICATE_EMAIL);
-        }
+    public GetUserProfileResponse getProfile(long userId) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserException(USER_NOT_FOUND));
+        return GetUserProfileResponse.builder()
+                .nickname(user.getNickname())
+                .build();
     }
 
     private void validateNickname(String nickname) {
-        if (userDao.hasDuplicateNickName(nickname)) {
+        if (userRepository.existsByNickname(nickname)) {
             throw new UserException(DUPLICATE_NICKNAME);
         }
-    }
 
+    }
 }

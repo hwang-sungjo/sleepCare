@@ -2,7 +2,6 @@ spring:
   profiles:
     group:
       "local": "localDB, devPort, secret, web-mvc"
-      "local-h2": "localh2DB, devPort, secret, web-mvc"
       "dev": "devDB, devPort, secret, web-mvc"
       "prod": "prodDB, prodPort, secret, web-mvc"
 
@@ -23,24 +22,8 @@ spring:
   sql:
     init:
       platform: mysql
+      mode: always
 
----
-
-spring:
-  config:
-    activate:
-      on-profile: "localh2DB"
-
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=MYSQL;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
 ---
 
 spring:
@@ -58,6 +41,7 @@ spring:
   sql:
     init:
       platform: mysql
+      mode: never
 
 ---
 
@@ -76,6 +60,7 @@ spring:
   sql:
     init:
       platform: mysql
+      mode: never
 
 ---
 
@@ -115,6 +100,20 @@ spring:
     activate:
       on-profile: "web-mvc"
 
+  jackson:
+    time-zone: Asia/Seoul
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: Asia/Seoul
+
   mvc:
     throw-exception-if-no-handler-found: true
 
@@ -124,3 +123,7 @@ spring:
 
   messages:
     basename: errors
+
+app:
+  frontend-origin: ${FRONTEND_ORIGIN:*}
+
