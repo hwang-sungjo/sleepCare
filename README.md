@@ -18,25 +18,20 @@ npm run dev
 
 출력은 `[backend]` / `[frontend]` 라벨이 붙은 채 한 화면에 보이고, `Ctrl+C` 한 번이면 둘 다 종료됩니다.
 
-> Windows의 PowerShell / cmd / Git Bash, macOS / Linux 어디서 실행해도 동일하게 동작합니다 (특정 셸 의존 없음 — `scripts/start-backend.js`가 OS별로 알맞은 gradle 래퍼를 호출).
-
-> Fitbit 등 새 데이터 소스를 붙여도 이 명령은 그대로입니다 — 추가는 백엔드 코드 안에서 일어나고, 띄우는 방식은 변하지 않습니다.
+> Windows의 PowerShell / cmd / Git Bash, macOS / Linux 어디서 실행해도 동일하게 동작합니다 (`scripts/start-backend.js`가 OS별로 알맞은 gradle 래퍼를 호출).
 
 ### 개별 실행
 
-문제 추적 등으로 따로 띄우고 싶을 때:
-
 ```bash
-# 백엔드만
-cd spring-server && ./gradlew bootRun
+# 백엔드만 (로컬 H2)
+cd spring-server && ./gradlew bootRun -Pprofile=local-h2
 # 프론트만
 cd frontend && npm run dev
 ```
 
 - 백엔드: `http://localhost:9000`  /  H2 콘솔: `http://localhost:9000/h2-console` (JDBC `jdbc:h2:file:./data/sleepcare`, User `sa`, 비밀번호 비움)
-- 프론트: `http://localhost:5173` — `/api/*` 호출은 [Vite 프록시](frontend/vite.config.ts)가 :9000으로 전달
+- 프론트: `http://localhost:5173`
 - 다른 프로파일로 백엔드 띄우기: `./gradlew bootRun -Pprofile=prod`
-- 인메모리 H2 + 개발용 JWT 키가 기본으로 잡혀 있어 별도 환경변수 설정은 불필요합니다.
 
 > **포트 충돌 시**
 > ```powershell
@@ -46,71 +41,56 @@ cd frontend && npm run dev
 
 ---
 
+## 🌐 백엔드 연결 설정
+
+프론트엔드는 `frontend/.env`의 `VITE_API_TARGET`으로 연결할 백엔드를 지정합니다.
+
+```
+# frontend/.env
+VITE_API_TARGET=http://localhost:9000      # 로컬 백엔드로 전환 시 이 줄 사용
+```
+
+변경 후 프론트 재시작(`npm run dev`)만 하면 됩니다. 코드 수정은 불필요합니다.
+
+### 같은 WiFi의 다른 기기에서 접속
+
+```bash
+cd frontend && npm run dev -- --host
+```
+
+노트북 IP 확인(PowerShell): `Get-NetIPAddress -AddressFamily IPv4 | Select InterfaceAlias, IPAddress`
+→ 휴대폰 브라우저에서 `http://<노트북-IP>:5173` 접속.
+
+---
+
 ## 🖱 사용해보기 (UI 동작 확인)
 
-`npm run dev`로 두 서버가 떴다면, 브라우저에서 **`http://localhost:5173`** 접속.
-
-> 💡 로컬 H2 DB는 파일 기반(`data/sleepcare.mv.db`)으로 작동하여, 백엔드를 재시작해도 가입한 계정과 설정한 알람 데이터가 영구적으로 보존됩니다.
+`npm run dev` 후 브라우저에서 **`http://localhost:5173`** 접속.
 
 | # | 화면 | 입력 | 기대 동작 |
 |---|------|------|-----------|
 | 1 | 로그인 화면 | — | "회원가입" 버튼 클릭 |
-| 2 | 회원가입 | 닉네임 `sleepy_user` / 비밀번호 `Pass@IoT7` / 비밀번호 확인 동일 | "계정 생성하기" → "회원가입이 완료되었습니다." 알림 후 로그인 화면으로 |
+| 2 | 회원가입 | 닉네임 `nickname` / 비밀번호 `password` / (선택) Fitbit 아이디·비밀번호 | "계정 생성하기" → "회원가입이 완료되었습니다." 알림 후 대시보드 바로 진입 |
 | 3 | 로그인 | 같은 닉네임/비밀번호 | "로그인" → 대시보드 진입 |
-| 4 | 대시보드 | — | 수면 효율 0%, 평균 수면 0h 0m, 가이드 메시지가 표시됨 *(수면 데이터 없을 때 정상값)* |
-| 5 | 알람 카드 클릭 | 시간 입력 (예: 07:30) | "알람 저장하기" → 대시보드 복귀, 카드에 07:30 표시 |
+| 4 | 대시보드 | — | 수면 효율·평균 수면 시간·가이드 메시지 표시 *(데이터 없을 때 `0% / 0h 0m` 정상)* |
+| 5 | 알람 카드 클릭 | 요일별(월~일) 7행에서 시간·적응형 모드·윈도우 설정 후 저장 | 대시보드 복귀, 오늘 기상 시간 카드에 반영 |
 | 6 | 로그아웃 | — | 토큰 삭제 + 로그인 화면 |
 
 ### 잘못된 입력으로 검증 확인
-- **닉네임 3자**(`abc`) → "nickname은 필수입니다." 또는 길이 오류 발생
-- **잘못된 특수문자**(`user!@#`) → 허용되지 않은 문자 오류
-- **이미 가입된 닉네임** → "이미 존재하는 닉네임입니다."
+- **닉네임 3자** → 4자 이상 입력 안내
+- **허용되지 않은 문자**(`user!@#`) → 영문/숫자/_ 안내
+- **이미 가입된 닉네임** → "이미 존재하는 아이디입니다."
 - **잘못된 비밀번호로 로그인** → "아이디 또는 비밀번호가 일치하지 않습니다."
 
 알림은 화면 하단에 토스트로 3초간 표시됩니다.
 
-### 백엔드 데이터 직접 확인
-H2 콘솔(`http://localhost:9000/h2-console`)에 접속해서 가입한 계정과 알람을 SQL로 확인할 수 있습니다.
+### 로컬 백엔드 데이터 직접 확인
+H2 콘솔(`http://localhost:9000/h2-console`)에서 SQL로 확인 가능합니다.
 ```sql
 SELECT * FROM users;
-SELECT * FROM alarms;
+SELECT * FROM daily_alarms;
+SELECT * FROM sleep_records;
 ```
-
----
-
-## 🌐 외부 접속 (포트포워딩 / 다른 기기에서 접속)
-
-기본값은 모두 `localhost`로 동작합니다. 다른 기기에서 접속하거나 백엔드가 외부 URL로 노출됐을 때만 아래 설정이 필요합니다.
-
-### 시나리오 A — 백엔드만 외부 URL로 열린 경우 *(가장 흔함)*
-프론트는 여전히 내 노트북에서 띄우고, 백엔드가 `http://203.0.113.10:9000` 같은 공인 주소로 열렸을 때.
-
-1. `frontend/.env.example`을 `frontend/.env`로 복사:
-   ```bash
-   cp frontend/.env.example frontend/.env
-   ```
-2. `frontend/.env`에서 받은 주소로 한 줄만 수정:
-   ```
-   VITE_API_TARGET=http://203.0.113.10:9000
-   ```
-3. 프론트만 재시작 (`npm run dev`).
-
-[Vite 프록시](frontend/vite.config.ts)가 자동으로 그 주소를 백엔드로 인식해 `/api/*`를 전달합니다. 프론트 코드 자체는 한 줄도 안 고쳐도 됩니다.
-
-### 시나리오 B — 휴대폰/다른 기기에서 같은 WiFi의 내 노트북에 접속
-백엔드와 프론트 모두 내 노트북에서 띄우고, 휴대폰으로 화면을 열어보고 싶을 때.
-
-1. 노트북에서 Vite를 외부 노출 모드로 띄우기:
-   ```bash
-   cd frontend && npm run dev -- --host
-   ```
-   (또는 [`frontend/vite.config.ts`](frontend/vite.config.ts)의 `server`에 `host: true` 추가)
-2. 노트북 IP 확인 (PowerShell): `Get-NetIPAddress -AddressFamily IPv4 | Select InterfaceAlias, IPAddress`
-3. 휴대폰 브라우저에서 `http://<노트북-IP>:5173` 접속.
-4. 방화벽이 5173/9000 포트를 막고 있으면 인바운드 규칙 추가 필요.
-
-### 시나리오 C — 프론트도 어딘가에 배포한 경우
-프론트가 별도 호스팅에서 서비스되고 백엔드가 다른 도메인이면, 호스팅 설정에서 `/api/*`를 백엔드로 reverse proxy 하거나 (Nginx · Cloudflare 등), Spring Boot에 CORS 설정을 추가해야 합니다. 본 저장소엔 아직 CORS 설정이 없으므로 배포 단계에 따로 작업합니다.
 
 ---
 
@@ -118,17 +98,17 @@ SELECT * FROM alarms;
 
 | Method | Path | 인증 | 설명 |
 |---|---|:---:|---|
-| POST | `/users` |   | 회원가입 |
-| GET  | `/users/me`        | ✓ | 로그인 사용자 프로필(닉네임) 조회 |
-| POST | `/auth/login`      |   | 로그인 → JWT 발급 |
-| GET  | `/alarms`          | ✓ | 알람 조회 (미설정 시 `00:00 / false`) |
-| PATCH| `/alarms`          | ✓ | 알람 시간 및 적응형 모드 설정 (upsert) |
-| GET  | `/dashboard/sleep-summary`| ✓ | 수면 효율 · 평균 수면 시간 · 가이드 메시지 |
+| POST  | `/users`                   |   | 회원가입 → JWT 즉시 발급 |
+| GET   | `/users/me`                | ✓ | 로그인 사용자 닉네임 조회 |
+| POST  | `/auth/login`              |   | 로그인 → JWT 발급 |
+| GET   | `/alarms`                  | ✓ | 요일별 알람 목록 및 오늘 기상 시간 조회 |
+| PATCH | `/alarms`                  | ✓ | 요일별 알람 시간·적응형 모드 설정 (upsert) |
+| GET   | `/dashboard/sleep-summary` | ✓ | 수면 효율 · 평균 수면 시간(분) · 가이드 메시지 |
 
 - 인증이 필요한 엔드포인트는 `Authorization: Bearer <token>` 헤더 필수.
-- 입력 검증: `nickname`은 영문/숫자/_ 조합 4~20자, `password`는 8~30자 허용.
-- 응답 포맷: `{ "code": 1000, "status": 200, "message": "성공", "result": { ... } }` 공통 래퍼 적용.
-- 상세 스펙은 [api_specification.md](api_specification.md) 참고.
+- `nickname`: 영문/숫자/_ 조합 4~20자 / `password`: 8~30자
+- 원격 백엔드는 `{ "code": 1000, "status": 200, "message": "...", "result": { ... } }` 래퍼 포맷 사용. 로컬 백엔드는 `result` 객체를 직접 반환 (프론트 클라이언트가 양쪽 모두 처리).
+- 상세 스펙은 [docs/api_specification.md](docs/api_specification.md) 참고.
 
 ---
 
@@ -139,7 +119,8 @@ SELECT * FROM alarms;
 | Frontend | React 18 + Vite + TypeScript + Tailwind CSS |
 | Backend  | Spring Boot 3.0 (Java 17, JDK 21 호환) + Spring JDBC + Spring Security |
 | Auth     | JWT (jjwt 0.11.2, HS256) |
-| DB       | H2 (개발) / MySQL (운영) |
+| DB       | H2 file-based (개발) / MySQL (운영) |
+| Crypto   | AES-256-GCM (Fitbit 비밀번호 암호화) |
 | Validation | Jakarta Bean Validation |
 | Build    | Gradle 8.9 |
 
@@ -151,45 +132,45 @@ SELECT * FROM alarms;
 sleepCare/
 ├── package.json                        # 루트: `npm run dev`로 두 서버 동시 실행
 ├── scripts/
-│   └── start-backend.js                # OS별 gradle 래퍼를 직접 호출 (셸 의존 없음)
+│   └── start-backend.js                # OS별 gradle 래퍼 호출 (셸 의존 없음)
 ├── frontend/                           # React 클라이언트
+│   ├── .env                            # VITE_API_TARGET (백엔드 주소)
 │   ├── src/
-│   │   ├── api/                        # 백엔드 호출 모듈 (auth, alarm, dashboard)
+│   │   ├── api/                        # auth, alarm, dashboard, user (클라이언트 모듈)
 │   │   ├── components/                 # Button, InputField, AlarmCard …
 │   │   ├── layouts/                    # PageWrapper
-│   │   ├── pages/                      # Login / Signup / Home / SetAlarm
+│   │   ├── pages/                      # Login / Signup / Home / SetAlarm (요일별 7행)
 │   │   └── hooks/                      # useNotification
-│   └── vite.config.ts                  # /api → :9000 프록시
+│   └── vite.config.ts
 ├── spring-server/                      # Spring Boot 백엔드
 │   └── src/main/java/project/server/
-│       ├── controller/api/             # AuthApi / Alarm / Dashboard
-│       ├── service/api/
-│       ├── dao/                        # AccountDao / AlarmDao / SleepRecordDao
+│       ├── controller/api/             # UserController / AuthController / AlarmController / DashboardController
+│       ├── service/api/                # AccountAuthService / AlarmService / DashboardService
+│       ├── dao/                        # AccountDao / AlarmDao (daily_alarms) / SleepRecordDao
 │       ├── dto/api/                    # 요청·응답 DTO
-│       ├── common/exception/api/       # ApiException + ErrorCode
+│       ├── common/exception/api/       # ApiException + ApiErrorCode
 │       ├── common/interceptor/         # ApiJwtInterceptor
-│       └── util/jwt/                   # JwtTokenProvider
+│       ├── util/jwt/                   # JwtTokenProvider
+│       └── util/crypto/               # AesGcmCipher (Fitbit 비밀번호 암호화)
 ├── docs/
-│   └── fitbit-integration-guide.md    # Fitbit 데이터 연동 가이드
-├── api_specification.md
+│   ├── api_specification.md            # API 통신 명세서
+│   └── fitbit-integration-guide.md    # Fitbit 수면 데이터 연동 가이드
 └── README.md
 ```
 
-> 구버전 레거시 코드는 모두 제거되었으며, 현재는 `/api/**` 엔드포인트와 `users` 테이블을 기반으로 동작합니다.
-
 ---
 
-## 🗄 데이터베이스 (PDF 기술서 기준)
+## 🗄 데이터베이스
 
 | 테이블 | 용도 |
 |---|---|
-| `users` | 회원 (id, nickname, password, fitbit_user_id, fitbit_user_password, created_at, updated_at) |
-| `alarms` | 사용자별 알람 (target_time, is_active) |
+| `users` | 회원 (id, nickname, password, fitbit_user_id, fitbit_user_password_enc) |
+| `daily_alarms` | 요일별 알람 (user_id, day_of_week, base_wake_time, adaptive_enabled, window_minutes_before, dynamic_wake_at) |
 | `sleep_records` | 수면 기록 (sleep_start/end, total_sleep_minutes, sleep_score) |
-| `sleep_environments` | 라즈베리파이/센서 환경 데이터 (temperature, humidity, co2, light, noise) |
-| `alarm_adjustments` | 적응형 알람 알고리즘 산출물 (recommended_time, reason …) |
+| `sleep_environments` | 센서 환경 데이터 (temperature, humidity, co2, light, noise) |
+| `alarm_adjustments` | 적응형 알람 산출물 (recommended_time, reason …) |
 
-> 현재 `/api/dashboard`는 `sleep_records`를 7일치 집계합니다. 데이터 입력 채널(웨어러블 / 라즈베리파이)이 아직 없어 초기 응답은 `0% / 0h 0m`입니다. 연동 방법은 [docs/fitbit-integration-guide.md](docs/fitbit-integration-guide.md) 참고.
+> `/dashboard/sleep-summary`는 `sleep_records`를 7일치 집계합니다. 웨어러블/라즈베리파이 연동 전까지 초기값은 `0% / 0분`입니다. 연동 방법은 [docs/fitbit-integration-guide.md](docs/fitbit-integration-guide.md) 참고.
 
 ---
 
