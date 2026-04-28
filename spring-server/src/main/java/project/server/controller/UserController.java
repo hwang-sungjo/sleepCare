@@ -2,6 +2,7 @@ package project.server.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import project.server.common.argument_resolver.PreAuthorize;
 import project.server.common.exception.UserException;
 import project.server.common.response.BaseResponse;
 import project.server.dto.user.*;
@@ -24,6 +25,24 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+
+    /**
+     * 내 프로필 조회
+     */
+    @GetMapping("/me")
+    public BaseResponse<GetUserProfileResponse> me(@PreAuthorize long userId) {
+        log.info("[UserController.me] user={}", userId);
+        return new BaseResponse<>(userService.getProfile(userId));
+    }
+
+    /**
+     * Fitbit 연동 상태 조회
+     */
+    @GetMapping("/me/fitbit")
+    public BaseResponse<GetUserFitbitStatusResponse> fitbitLinkage(@PreAuthorize long userId) {
+        log.info("[UserController.fitbitLinkage] user={}", userId);
+        return new BaseResponse<>(userService.getFitbitStatus(userId));
+    }
 
     /**
      * 회원 가입

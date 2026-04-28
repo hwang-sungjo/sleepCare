@@ -76,10 +76,27 @@ public class JwtTokenProvider {
     }
 
     public String getPrincipal(String token) {
+        return parseClaims(token).getSubject();
+    }
+
+    /** Requires valid, non-expired JWT (caller validates expiry first). */
+    public long getUserId(String token) {
+        Claims claims = parseClaims(token);
+        Object userIdClaim = claims.get("userId");
+        if (userIdClaim == null) {
+            throw new JwtInvalidTokenException(INVALID_TOKEN);
+        }
+        if (userIdClaim instanceof Number number) {
+            return number.longValue();
+        }
+        throw new JwtInvalidTokenException(INVALID_TOKEN);
+    }
+
+    private Claims parseClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(JWT_SECRET_KEY.getBytes(StandardCharsets.UTF_8)).build()
                 .parseClaimsJws(token)
-                .getBody().getSubject();
+                .getBody();
     }
 
     public String resolveToken(HttpServletRequest request) {
