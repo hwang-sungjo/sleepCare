@@ -22,7 +22,7 @@ spring:
   sql:
     init:
       platform: mysql
-      mode: always
+      mode: never
 
 ---
 

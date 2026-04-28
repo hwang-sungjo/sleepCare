@@ -27,16 +27,16 @@ public class AuthService {
     public LoginResponse login(LoginRequest authRequest) {
         log.info("[AuthService.login]");
 
-        String loginId = authRequest.getUserId();
+        String nickname = authRequest.getNickname();
 
         long userId = userRepository
-                .findByNickname(loginId)
+                .findByNickname(nickname)
                 .map(UserEntity::getUserId)
                 .orElseThrow(() -> new UserException(EMAIL_NOT_FOUND));
 
         validatePassword(authRequest.getPassword(), userId);
 
-        String updatedJwt = jwtTokenProvider.createToken(loginId, userId);
+        String updatedJwt = jwtTokenProvider.createToken(nickname, userId);
 
         return new LoginResponse(userId, updatedJwt);
     }
