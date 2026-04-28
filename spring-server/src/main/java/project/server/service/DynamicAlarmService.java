@@ -35,13 +35,20 @@ public class DynamicAlarmService {
 
     @Transactional
     public void recalculateForUser(Long userId) {
-        AlarmEntity alarm = alarmRepository.findByUserId(userId).orElse(null);
+        int todayDay = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();
+        AlarmEntity alarm = alarmRepository.findByUserIdAndDayOfWeek(userId, todayDay).orElse(null);
         if (alarm == null || Boolean.FALSE.equals(alarm.getAdaptiveEnabled())) {
             return;
         }
         Instant now = Instant.now();
         Instant windowEnd = calculateWindowEndInstant(alarm, now);
         if (windowEnd == null) {
+            alarm.setDynamicWakeAt(null);
+            alarmRepository.save(alarm);
+            return;
+        }
+        // 오늘 알람이 이미 울렸다면 다이나믹 값을 제거해 다음 주 동일 요일에서 다시 계산한다.
+        if (hasRungAlready(alarm, now, windowEnd)) {
             alarm.setDynamicWakeAt(null);
             alarmRepository.save(alarm);
             return;
@@ -55,6 +62,7 @@ public class DynamicAlarmService {
         Instant chosenInstant = slices.stream()
                 .map(s -> shallowInstantInWindow(s, windowStart, windowEnd))
                 .filter(java.util.Objects::nonNull)
+                .filter(t -> !t.isBefore(now))
                 .min(Comparator.naturalOrder())
                 .orElse(windowEnd); // sensible default: ring at configured goal time when no granular data
 
@@ -72,7 +80,15 @@ public class DynamicAlarmService {
         LocalDate today = LocalDate.ofInstant(reference, DEFAULT_ZONE);
         LocalDateTime goal = LocalDateTime.of(today, alarm.getBaseWakeTime());
         Instant candidate = goal.atZone(DEFAULT_ZONE).toInstant();
-        return reference.isBefore(candidate) ? candidate : null;
+        return candidate;
+    }
+
+    private static boolean hasRungAlready(AlarmEntity alarm, Instant now, Instant baseWakeInstant) {
+        Instant todayDynamic = alarm.getDynamicWakeAt();
+        if (todayDynamic != null) {
+            return !now.isBefore(todayDynamic);
+        }
+        return !now.isBefore(baseWakeInstant);
     }
 
     private static Instant shallowInstantInWindow(FitbitDataEntity row, Instant windowStart, Instant windowEnd) {

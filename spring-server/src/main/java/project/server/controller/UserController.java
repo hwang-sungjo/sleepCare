@@ -3,6 +3,7 @@ package project.server.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import project.server.common.argument_resolver.PreAuthorize;
 import project.server.common.exception.UserException;
+import project.server.common.response.BaseErrorResponse;
 import project.server.common.response.BaseResponse;
 import project.server.dto.user.*;
 import project.server.service.UserService;
@@ -41,7 +43,33 @@ public class UserController {
                     responseCode = "200",
                     description = "조회 성공",
                     content = @Content(schema = @Schema(implementation = GetUserProfileResponse.class))),
-            @ApiResponse(responseCode = "401", description = "JWT 없음/만료/형식 오류")
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT 없음/만료/형식 오류",
+                    content = @Content(
+                            schema = @Schema(implementation = BaseErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(
+                                            name = "TokenNotFound",
+                                            value = """
+                                                    {
+                                                      "code": 4001,
+                                                      "status": 400,
+                                                      "message": "토큰이 HTTP Header에 없습니다.",
+                                                      "timestamp": "2026-04-28T19:20:15.123"
+                                                    }
+                                                    """),
+                                    @ExampleObject(
+                                            name = "TokenExpired",
+                                            value = """
+                                                    {
+                                                      "code": 4005,
+                                                      "status": 401,
+                                                      "message": "만료된 토큰입니다.",
+                                                      "timestamp": "2026-04-28T19:20:15.123"
+                                                    }
+                                                    """)
+                            }))
     })
     @GetMapping("/me")
     public BaseResponse<GetUserProfileResponse> me(
@@ -58,7 +86,33 @@ public class UserController {
                     responseCode = "200",
                     description = "가입 성공",
                     content = @Content(schema = @Schema(implementation = PostUserResponse.class))),
-            @ApiResponse(responseCode = "400", description = "입력값 오류 또는 닉네임 중복")
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "입력값 오류 또는 닉네임 중복",
+                    content = @Content(
+                            schema = @Schema(implementation = BaseErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(
+                                            name = "NicknameDuplicate",
+                                            value = """
+                                                    {
+                                                      "code": 5002,
+                                                      "status": 400,
+                                                      "message": "이미 존재하는 닉네임입니다.",
+                                                      "timestamp": "2026-04-28T19:20:15.123"
+                                                    }
+                                                    """),
+                                    @ExampleObject(
+                                            name = "ValidationFail",
+                                            value = """
+                                                    {
+                                                      "code": 5000,
+                                                      "status": 400,
+                                                      "message": "password: {NotBlank}",
+                                                      "timestamp": "2026-04-28T19:20:15.123"
+                                                    }
+                                                    """)
+                            }))
     })
     @PostMapping("")
     public BaseResponse<PostUserResponse> signUp(@Validated @RequestBody PostUserRequest postUserRequest,

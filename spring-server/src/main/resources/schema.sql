@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS `fitbit_data` (
 CREATE TABLE IF NOT EXISTS `alarm` (
     `alarm_id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `user_id` BIGINT NOT NULL,
+    `day_of_week` TINYINT NOT NULL,
     `base_wake_time` TIME NOT NULL,
     `dynamic_wake_at` DATETIME(6),
     `adaptive_enabled` BOOLEAN NOT NULL DEFAULT TRUE,
@@ -55,5 +56,5 @@ CREATE TABLE IF NOT EXISTS `alarm` (
     `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT `fk_alarm_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE,
-    CONSTRAINT `uk_alarm_user` UNIQUE (`user_id`)
+    CONSTRAINT `uk_alarm_user_day` UNIQUE (`user_id`, `day_of_week`)
 );

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import static project.server.common.response.status.BaseExceptionResponseStatus.*;
 
 import java.time.LocalTime;
+import java.util.stream.IntStream;
 
 @Slf4j
 @Service
@@ -42,14 +43,16 @@ public class UserService {
                 .build();
 
         UserEntity saved = userRepository.save(user);
-        alarmRepository.save(
-                AlarmEntity.builder()
-                        .userId(saved.getUserId())
-                        .baseWakeTime(LocalTime.of(7, 30))
-                        .dynamicWakeAt(null)
-                        .adaptiveEnabled(true)
-                        .windowMinutesBefore(30)
-                        .build());
+        IntStream.rangeClosed(1, 7).forEach(day ->
+                alarmRepository.save(
+                        AlarmEntity.builder()
+                                .userId(saved.getUserId())
+                                .dayOfWeek(day)
+                                .baseWakeTime(LocalTime.of(7, 30))
+                                .dynamicWakeAt(null)
+                                .adaptiveEnabled(true)
+                                .windowMinutesBefore(30)
+                                .build()));
 
         String jwt = jwtTokenProvider.createToken(nickname, saved.getUserId());
 

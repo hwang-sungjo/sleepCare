@@ -3,6 +3,7 @@ package project.server.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import project.server.common.argument_resolver.PreAuthorize;
+import project.server.common.response.BaseErrorResponse;
 import project.server.common.response.BaseResponse;
 import project.server.dto.dashboard.GetSleepDashboardResponse;
 import project.server.service.DashboardService;
@@ -38,7 +40,21 @@ public class DashboardController {
                     responseCode = "200",
                     description = "조회 성공",
                     content = @Content(schema = @Schema(implementation = GetSleepDashboardResponse.class))),
-            @ApiResponse(responseCode = "401", description = "JWT 검증 실패")
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT 검증 실패",
+                    content = @Content(
+                            schema = @Schema(implementation = BaseErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "TokenNotFound",
+                                    value = """
+                                            {
+                                              "code": 4001,
+                                              "status": 400,
+                                              "message": "토큰이 HTTP Header에 없습니다.",
+                                              "timestamp": "2026-04-28T19:20:15.123"
+                                            }
+                                            """)))
     })
     @GetMapping("/sleep-summary")
     public BaseResponse<GetSleepDashboardResponse> summary(
