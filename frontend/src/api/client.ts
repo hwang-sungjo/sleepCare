@@ -12,20 +12,22 @@ export function clearToken(): void {
     localStorage.removeItem(TOKEN_KEY);
 }
 
+// 원격 백엔드의 BaseErrorResponse 포맷
 export interface ApiErrorBody {
-    errorCode?: string;
+    code?: number;
+    status?: number;
     message?: string;
     timestamp?: string;
 }
 
 export class ApiError extends Error {
     readonly status: number;
-    readonly errorCode?: string;
+    readonly code?: number;
 
     constructor(status: number, body: ApiErrorBody | null, fallback: string) {
         super(body?.message || fallback);
         this.status = status;
-        this.errorCode = body?.errorCode;
+        this.code = body?.code;
     }
 }
 
@@ -44,7 +46,10 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
         if (token) headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(path, {
+    const API_BASE_URL = import.meta.env.VITE_API_TARGET;
+    const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
+
+    const res = await fetch(url, {
         method,
         headers,
         body: body == null ? undefined : JSON.stringify(body),
@@ -61,5 +66,10 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     }
 
     if (res.status === 204) return undefined as T;
-    return (await res.json()) as T;
+    const data = await res.json();
+    // 백엔드가 { code, status, message, result } 형태로 래핑하여 보내는 경우 처리
+    if (data && 'result' in data) {
+        return data.result as T;
+    }
+    return data as T;
 }

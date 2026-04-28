@@ -5,16 +5,35 @@ import PageWrapper from '../layouts/PageWrapper';
 import AlarmCard from '../components/AlarmCard';
 import { getDashboard, DashboardResponse } from '../api/dashboard';
 import { getAlarm } from '../api/alarm';
+import { getMe } from '../api/user';
 import { ApiError } from '../api/client';
 
 interface HomePageProps {
-    userName: string;
+    nickname: string;
     notification: string | null;
     onNavigate: (page: PageName) => void;
     onLogout: () => void;
+    onNicknameLoaded: (nickname: string) => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ userName, notification, onNavigate, onLogout }) => {
+function formatMinutes(totalMinutes: number): string {
+    if (!totalMinutes || totalMinutes <= 0) return '0h 0m';
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${hours}h ${mins}m`;
+}
+
+function extractHHmm(isoOrNull: string | null): string {
+    if (!isoOrNull) return '미설정';
+    // ISO datetime → HH:mm 추출
+    const d = new Date(isoOrNull);
+    if (isNaN(d.getTime())) return '미설정';
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+}
+
+const HomePage: React.FC<HomePageProps> = ({ nickname, notification, onNavigate, onLogout, onNicknameLoaded }) => {
     const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
     const [alarmTime, setAlarmTime] = useState<string>('--:--');
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -22,11 +41,14 @@ const HomePage: React.FC<HomePageProps> = ({ userName, notification, onNavigate,
     useEffect(() => {
         let active = true;
 
-        Promise.all([getDashboard(), getAlarm()])
-            .then(([d, a]) => {
+        Promise.all([getDashboard(), getAlarm(), getMe()])
+            .then(([d, a, me]) => {
                 if (!active) return;
                 setDashboard(d);
-                setAlarmTime(a.isEnabled ? a.alarmTime : '미설정');
+                setAlarmTime(extractHHmm(a.todayEffectiveWakeAt));
+                if (me.nickname && me.nickname !== nickname) {
+                    onNicknameLoaded(me.nickname);
+                }
             })
             .catch((err: unknown) => {
                 if (!active) return;
@@ -37,13 +59,14 @@ const HomePage: React.FC<HomePageProps> = ({ userName, notification, onNavigate,
         return () => {
             active = false;
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
         <PageWrapper title="대시보드" currentPage="home" notification={notification}>
             <div className="mb-8">
                 <p className="text-slate-400 mb-1">좋은 밤입니다,</p>
-                <h2 className="text-3xl font-bold">{userName || 'Sleepy User'} 님 🌙</h2>
+                <h2 className="text-3xl font-bold">{nickname || 'Sleepy User'} 님 🌙</h2>
             </div>
 
             {loadError && (
@@ -53,7 +76,7 @@ const HomePage: React.FC<HomePageProps> = ({ userName, notification, onNavigate,
             )}
 
             <section className="mb-10">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">현재 설정된 알람</h3>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">오늘 알람</h3>
                 <AlarmCard time={alarmTime} onClick={() => onNavigate('setAlarm')} />
             </section>
 
@@ -61,12 +84,12 @@ const HomePage: React.FC<HomePageProps> = ({ userName, notification, onNavigate,
                 <div className="bg-slate-900 p-5 rounded-3xl border border-white/5">
                     <div className="text-emerald-400 mb-2"><Activity size={24} /></div>
                     <div className="text-sm text-slate-400">수면 효율</div>
-                    <div className="text-xl font-bold">{dashboard ? `${dashboard.sleepEfficiency}%` : '—'}</div>
+                    <div className="text-xl font-bold">{dashboard ? `${dashboard.sleepEfficiencyPercent}%` : '—'}</div>
                 </div>
                 <div className="bg-slate-900 p-5 rounded-3xl border border-white/5">
                     <div className="text-indigo-400 mb-2"><Clock size={24} /></div>
                     <div className="text-sm text-slate-400">평균 수면</div>
-                    <div className="text-xl font-bold">{dashboard ? dashboard.averageSleepTime : '—'}</div>
+                    <div className="text-xl font-bold">{dashboard ? formatMinutes(dashboard.averageSleepDurationMinutes) : '—'}</div>
                 </div>
             </section>
 
@@ -76,7 +99,7 @@ const HomePage: React.FC<HomePageProps> = ({ userName, notification, onNavigate,
                     수면 가이드
                 </h4>
                 <p className="text-sm text-indigo-200/80 leading-relaxed">
-                    {dashboard ? dashboard.guideMessage : '데이터를 불러오는 중입니다...'}
+                    {dashboard ? dashboard.environmentHint : '데이터를 불러오는 중입니다...'}
                 </p>
             </div>
 

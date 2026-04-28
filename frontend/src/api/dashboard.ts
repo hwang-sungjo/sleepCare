@@ -1,11 +1,11 @@
 import { request } from './client';
 
 export interface DashboardResponse {
-    sleepEfficiency: number;
-    averageSleepTime: string;
-    guideMessage: string;
+    sleepEfficiencyPercent: number;
+    averageSleepDurationMinutes: number;
+    environmentHint: string;
 }
 
 export function getDashboard(): Promise<DashboardResponse> {
-    return request<DashboardResponse>('/api/dashboard', { auth: true });
+    return request<DashboardResponse>('/dashboard/sleep-summary', { auth: true });
 }

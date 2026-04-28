@@ -6,20 +6,20 @@ import Button from '../components/Button';
 import InputField from '../components/InputField';
 
 interface LoginPageProps {
-    userId: string;
+    nickname: string;
     password: string;
     notification: string | null;
-    onUserIdChange: (value: string) => void;
+    onNicknameChange: (value: string) => void;
     onPasswordChange: (value: string) => void;
     onLogin: (e: React.FormEvent) => void;
     onNavigate: (page: PageName) => void;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({
-    userId,
+    nickname,
     password,
     notification,
-    onUserIdChange,
+    onNicknameChange,
     onPasswordChange,
     onLogin,
     onNavigate,
@@ -37,11 +37,11 @@ const LoginPage: React.FC<LoginPageProps> = ({
         </div>
         <form onSubmit={onLogin} className="flex flex-col flex-1">
             <InputField
-                label="아이디"
-                placeholder="이메일 또는 아이디"
+                label="닉네임"
+                placeholder="닉네임 입력"
                 icon={User}
-                value={userId}
-                onChange={(e) => onUserIdChange(e.target.value)}
+                value={nickname}
+                onChange={(e) => onNicknameChange(e.target.value)}
             />
             <InputField
                 label="비밀번호"

@@ -33,7 +33,7 @@ cd spring-server && ./gradlew bootRun
 cd frontend && npm run dev
 ```
 
-- 백엔드: `http://localhost:9000`  /  H2 콘솔: `http://localhost:9000/h2-console` (JDBC `jdbc:h2:mem:testdb`, User `sa`, 비밀번호 비움)
+- 백엔드: `http://localhost:9000`  /  H2 콘솔: `http://localhost:9000/h2-console` (JDBC `jdbc:h2:file:./data/sleepcare`, User `sa`, 비밀번호 비움)
 - 프론트: `http://localhost:5173` — `/api/*` 호출은 [Vite 프록시](frontend/vite.config.ts)가 :9000으로 전달
 - 다른 프로파일로 백엔드 띄우기: `./gradlew bootRun -Pprofile=prod`
 - 인메모리 H2 + 개발용 JWT 키가 기본으로 잡혀 있어 별도 환경변수 설정은 불필요합니다.
@@ -50,21 +50,21 @@ cd frontend && npm run dev
 
 `npm run dev`로 두 서버가 떴다면, 브라우저에서 **`http://localhost:5173`** 접속.
 
-> 💡 H2는 **인메모리** DB라 백엔드를 재시작하면 가입한 계정·설정한 알람이 모두 초기화됩니다. UI 테스트할 때 매번 회원가입부터 시작하면 됩니다.
+> 💡 로컬 H2 DB는 파일 기반(`data/sleepcare.mv.db`)으로 작동하여, 백엔드를 재시작해도 가입한 계정과 설정한 알람 데이터가 영구적으로 보존됩니다.
 
 | # | 화면 | 입력 | 기대 동작 |
 |---|------|------|-----------|
 | 1 | 로그인 화면 | — | "회원가입" 버튼 클릭 |
-| 2 | 회원가입 | 아이디 `test123` / 비밀번호 `testpass1` / 비밀번호 확인 동일 | "계정 생성하기" → "회원가입이 완료되었습니다." 알림 후 로그인 화면으로 |
-| 3 | 로그인 | 같은 아이디/비밀번호 | "로그인" → 대시보드 진입 |
+| 2 | 회원가입 | 닉네임 `sleepy_user` / 비밀번호 `Pass@IoT7` / 비밀번호 확인 동일 | "계정 생성하기" → "회원가입이 완료되었습니다." 알림 후 로그인 화면으로 |
+| 3 | 로그인 | 같은 닉네임/비밀번호 | "로그인" → 대시보드 진입 |
 | 4 | 대시보드 | — | 수면 효율 0%, 평균 수면 0h 0m, 가이드 메시지가 표시됨 *(수면 데이터 없을 때 정상값)* |
 | 5 | 알람 카드 클릭 | 시간 입력 (예: 07:30) | "알람 저장하기" → 대시보드 복귀, 카드에 07:30 표시 |
 | 6 | 로그아웃 | — | 토큰 삭제 + 로그인 화면 |
 
 ### 잘못된 입력으로 검증 확인
-- **아이디 4자**(`abcd`) → "userId는 영문 소문자와 숫자로 5~20자여야 합니다."
-- **대문자 포함**(`USER123`) → 같은 메시지
-- **이미 가입된 아이디** → "이미 존재하는 아이디입니다."
+- **닉네임 3자**(`abc`) → "nickname은 필수입니다." 또는 길이 오류 발생
+- **잘못된 특수문자**(`user!@#`) → 허용되지 않은 문자 오류
+- **이미 가입된 닉네임** → "이미 존재하는 닉네임입니다."
 - **잘못된 비밀번호로 로그인** → "아이디 또는 비밀번호가 일치하지 않습니다."
 
 알림은 화면 하단에 토스트로 3초간 표시됩니다.
@@ -118,15 +118,16 @@ SELECT * FROM alarms;
 
 | Method | Path | 인증 | 설명 |
 |---|---|:---:|---|
-| POST | `/api/auth/signup` |   | 회원가입 |
-| POST | `/api/auth/login`  |   | 로그인 → JWT 발급 |
-| GET  | `/api/alarms`      | ✓ | 알람 조회 (미설정 시 `00:00 / false`) |
-| POST | `/api/alarms`      | ✓ | 알람 시간 저장 (upsert) |
-| GET  | `/api/dashboard`   | ✓ | 수면 효율 · 평균 수면 시간 · 가이드 메시지 |
+| POST | `/users` |   | 회원가입 |
+| GET  | `/users/me`        | ✓ | 로그인 사용자 프로필(닉네임) 조회 |
+| POST | `/auth/login`      |   | 로그인 → JWT 발급 |
+| GET  | `/alarms`          | ✓ | 알람 조회 (미설정 시 `00:00 / false`) |
+| PATCH| `/alarms`          | ✓ | 알람 시간 및 적응형 모드 설정 (upsert) |
+| GET  | `/dashboard/sleep-summary`| ✓ | 수면 효율 · 평균 수면 시간 · 가이드 메시지 |
 
 - 인증이 필요한 엔드포인트는 `Authorization: Bearer <token>` 헤더 필수.
-- 입력 검증: `userId`/`password`는 영문 소문자+숫자, 각각 **5~20자** / **8~20자**.
-- 에러 응답 포맷: `{ "errorCode": "AUTH_001", "message": "...", "timestamp": "..." }`
+- 입력 검증: `nickname`은 영문/숫자/_ 조합 4~20자, `password`는 8~30자 허용.
+- 응답 포맷: `{ "code": 1000, "status": 200, "message": "성공", "result": { ... } }` 공통 래퍼 적용.
 - 상세 스펙은 [api_specification.md](api_specification.md) 참고.
 
 ---
@@ -174,7 +175,7 @@ sleepCare/
 └── README.md
 ```
 
-> 기존 `/users/**`, `/auth/login` 엔드포인트와 `user` (단수) 테이블은 레거시로 그대로 유지되며, PDF 기술서 기반 신규 도메인은 `/api/**` 와 `users` (복수) 테이블에 분리되어 있습니다.
+> 구버전 레거시 코드는 모두 제거되었으며, 현재는 `/api/**` 엔드포인트와 `users` 테이블을 기반으로 동작합니다.
 
 ---
 
@@ -182,7 +183,7 @@ sleepCare/
 
 | 테이블 | 용도 |
 |---|---|
-| `users` | 회원 (id, username, password, created_at, updated_at) |
+| `users` | 회원 (id, nickname, password, fitbit_user_id, fitbit_user_password, created_at, updated_at) |
 | `alarms` | 사용자별 알람 (target_time, is_active) |
 | `sleep_records` | 수면 기록 (sleep_start/end, total_sleep_minutes, sleep_score) |
 | `sleep_environments` | 라즈베리파이/센서 환경 데이터 (temperature, humidity, co2, light, noise) |

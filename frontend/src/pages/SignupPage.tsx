@@ -1,36 +1,37 @@
 import React, { useState } from 'react';
-import { User, Lock, CheckCircle2 } from 'lucide-react';
+import { User, Lock, CheckCircle2, Watch, Key } from 'lucide-react';
 import PageWrapper from '../layouts/PageWrapper';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
 
 interface SignupPageProps {
     notification: string | null;
-    onSignup: (userId: string, password: string, passwordConfirm: string) => void;
+    onSignup: (
+        nickname: string,
+        password: string,
+        passwordConfirm: string,
+        fitbitUserId: string,
+        fitbitUserPassword: string,
+    ) => void;
     onBack: () => void;
 }
 
-const USER_ID_REGEX = /^[a-z0-9]{5,20}$/;
-const PASSWORD_REGEX = /^[a-z0-9]{8,20}$/;
+const NICKNAME_REGEX = /^[a-zA-Z0-9_]{4,20}$/;
 
-function validateUserId(value: string): { hint: string; type: 'info' | 'error' | 'success' } {
-    if (value.length === 0) return { hint: '영문 소문자와 숫자 조합, 5~20자', type: 'info' };
-    if (/[A-Z]/.test(value)) return { hint: '대문자는 사용할 수 없습니다', type: 'error' };
-    if (/[^a-z0-9]/.test(value)) return { hint: '영문 소문자와 숫자만 사용 가능합니다', type: 'error' };
-    if (value.length < 5) return { hint: `${5 - value.length}자 더 입력해주세요 (최소 5자)`, type: 'error' };
+function validateNickname(value: string): { hint: string; type: 'info' | 'error' | 'success' } {
+    if (value.length === 0) return { hint: '영문/숫자/_ 조합, 4~20자', type: 'info' };
+    if (/[^a-zA-Z0-9_]/.test(value)) return { hint: '영문, 숫자, 밑줄(_)만 사용 가능합니다', type: 'error' };
+    if (value.length < 4) return { hint: `${4 - value.length}자 더 입력해주세요 (최소 4자)`, type: 'error' };
     if (value.length > 20) return { hint: '20자 이하로 입력해주세요', type: 'error' };
-    if (USER_ID_REGEX.test(value)) return { hint: '사용 가능한 아이디입니다 ✓', type: 'success' };
-    return { hint: '영문 소문자와 숫자 조합, 5~20자', type: 'error' };
+    if (NICKNAME_REGEX.test(value)) return { hint: '사용 가능한 닉네임입니다 ✓', type: 'success' };
+    return { hint: '영문/숫자/_ 조합, 4~20자', type: 'error' };
 }
 
 function validatePassword(value: string): { hint: string; type: 'info' | 'error' | 'success' } {
-    if (value.length === 0) return { hint: '영문 소문자와 숫자 조합, 8~20자', type: 'info' };
-    if (/[A-Z]/.test(value)) return { hint: '대문자는 사용할 수 없습니다', type: 'error' };
-    if (/[^a-z0-9]/.test(value)) return { hint: '영문 소문자와 숫자만 사용 가능합니다', type: 'error' };
+    if (value.length === 0) return { hint: '8~30자, 대소문자·숫자·특수문자 자유 조합', type: 'info' };
     if (value.length < 8) return { hint: `${8 - value.length}자 더 입력해주세요 (최소 8자)`, type: 'error' };
-    if (value.length > 20) return { hint: '20자 이하로 입력해주세요', type: 'error' };
-    if (PASSWORD_REGEX.test(value)) return { hint: '사용 가능한 비밀번호입니다 ✓', type: 'success' };
-    return { hint: '영문 소문자와 숫자 조합, 8~20자', type: 'error' };
+    if (value.length > 30) return { hint: '30자 이하로 입력해주세요', type: 'error' };
+    return { hint: '사용 가능한 비밀번호입니다 ✓', type: 'success' };
 }
 
 function validatePasswordConfirm(password: string, confirm: string): { hint: string; type: 'info' | 'error' | 'success' } {
@@ -40,16 +41,18 @@ function validatePasswordConfirm(password: string, confirm: string): { hint: str
 }
 
 const SignupPage: React.FC<SignupPageProps> = ({ notification, onSignup, onBack }) => {
-    const [userId, setUserId] = useState('');
+    const [nickname, setNickname] = useState('');
     const [password, setPassword] = useState('');
     const [passwordConfirm, setPasswordConfirm] = useState('');
+    const [fitbitUserId, setFitbitUserId] = useState('');
+    const [fitbitUserPassword, setFitbitUserPassword] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSignup(userId, password, passwordConfirm);
+        onSignup(nickname, password, passwordConfirm, fitbitUserId, fitbitUserPassword);
     };
 
-    const userIdHint = validateUserId(userId);
+    const nicknameHint = validateNickname(nickname);
     const passwordHint = validatePassword(password);
     const confirmHint = validatePasswordConfirm(password, passwordConfirm);
 
@@ -62,18 +65,18 @@ const SignupPage: React.FC<SignupPageProps> = ({ notification, onSignup, onBack 
             </p>
             <form onSubmit={handleSubmit} className="flex flex-col flex-1">
                 <InputField
-                    label="아이디"
-                    placeholder="영문 소문자+숫자, 5~20자"
+                    label="닉네임"
+                    placeholder="영문/숫자/_ 4~20자"
                     icon={User}
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
-                    hint={userIdHint.hint}
-                    hintType={userIdHint.type}
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    hint={nicknameHint.hint}
+                    hintType={nicknameHint.type}
                 />
                 <InputField
                     label="비밀번호"
                     type="password"
-                    placeholder="영문 소문자+숫자, 8~20자"
+                    placeholder="8~30자"
                     icon={Lock}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -90,6 +93,28 @@ const SignupPage: React.FC<SignupPageProps> = ({ notification, onSignup, onBack 
                     hint={confirmHint.hint}
                     hintType={confirmHint.type}
                 />
+
+                <div className="mt-2 mb-4 px-4 py-3 rounded-2xl bg-indigo-900/20 border border-indigo-500/20">
+                    <p className="text-xs text-indigo-200/80">
+                        Fitbit 계정 연동 (선택) — 수면 데이터 자동 동기화에 사용됩니다.
+                    </p>
+                </div>
+                <InputField
+                    label="Fitbit 아이디"
+                    placeholder="(선택) Fitbit 계정 ID"
+                    icon={Watch}
+                    value={fitbitUserId}
+                    onChange={(e) => setFitbitUserId(e.target.value)}
+                />
+                <InputField
+                    label="Fitbit 비밀번호"
+                    type="password"
+                    placeholder="(선택) Fitbit 계정 비밀번호"
+                    icon={Key}
+                    value={fitbitUserPassword}
+                    onChange={(e) => setFitbitUserPassword(e.target.value)}
+                />
+
                 <div className="mt-auto">
                     <Button type="submit">계정 생성하기</Button>
                 </div>
@@ -99,4 +124,3 @@ const SignupPage: React.FC<SignupPageProps> = ({ notification, onSignup, onBack 
 };
 
 export default SignupPage;
-
