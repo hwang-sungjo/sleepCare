@@ -2,109 +2,149 @@ package project.server.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+
 import project.server.dao.DailyHealthSummaryRepository;
-import project.server.dao.HeartRateLogRepository;
-import project.server.dao.HrvLogRepository;
-import project.server.dao.SleepStageLogRepository;
-import project.server.dao.SpO2LogRepository;
-import project.server.entity.*;
+import project.server.dao.FitbitRepository;
+import project.server.dao.HeartRateRepository;
+import project.server.dao.HrvRepository;
+import project.server.dao.SleepStageRepository;
+import project.server.dao.SpO2Repository;
+import project.server.dao.entity.FitbitEntity;
+import project.server.entity.DailyHealthSummary;
+import project.server.entity.HeartRate;
+import project.server.entity.Hrv;
+import project.server.entity.SleepStage;
+import project.server.entity.SpO2;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
+/**
+ * Fitbit Cloud → 로컬 DB 동기화 파이프라인.
+ *
+ * <p>두 개의 진입점이 있다.</p>
+ * <ul>
+ *   <li>{@link #initialSyncForUser(Long)} : 가입 직후 비동기로 1회 호출. 토큰을 refresh로
+ *       검증·갱신한 뒤 7일치 데이터를 <b>존재 여부 확인 없이</b> 모두 적재한다.</li>
+ *   <li>{@link #scheduledFullSync()} : 주기 호출. 모든 fitbit 행을 돌며 토큰을 갱신하고
+ *       (user, date) 쌍이 이미 있는 날짜는 통째로 스킵하여 새로운 날짜만 채운다.</li>
+ * </ul>
+ * 두 경로 모두 시작 시점에 {@link FitbitAuthService#refreshAndPersist(FitbitEntity)} 으로
+ * fitbit 행의 access/refresh/expires_at 을 즉시 갱신한다.
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FitbitSyncService {
 
-    private final FitbitAuthService authService;
-    private final DailyHealthSummaryRepository summaryRepo;
-    private final HeartRateLogRepository hrRepo;
-    private final SleepStageLogRepository stageRepo;
-    private final SpO2LogRepository spo2Repo;
-    private final HrvLogRepository hrvRepo;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    // 🌟 15분마다 실행 (900,000ms). 이전 작업이 끝난 후부터 15분을 셉니다.
-    @Scheduled(fixedDelay = 15 * 60 * 1000)
-    @Transactional
+    private final FitbitAuthService authService;
+    private final FitbitRepository fitbitRepository;
+    private final DailyHealthSummaryRepository summaryRepo;
+    private final HeartRateRepository hrRepo;
+    private final SleepStageRepository stageRepo;
+    private final SpO2Repository spo2Repo;
+    private final HrvRepository hrvRepo;
+
+    @Scheduled(fixedDelayString = "${app.fitbit.sync-interval-ms:900000}")
     public void scheduledFullSync() {
-        // 아직 토큰이 입력되지 않은 초기 상태라면 실행하지 않음
-        if (authService.getAccessToken() == null || authService.getAccessToken().isEmpty()) {
+        for (FitbitEntity entity : fitbitRepository.findAll()) {
+            String accessToken = authService.refreshAndPersist(entity);
+            if (accessToken == null) {
+                continue;
+            }
+            syncForUser(entity, accessToken, /* skipExistingDays = */ true);
+        }
+    }
+
+    /**
+     * 가입 직후 비동기로 호출되는 초기 적재.
+     * refresh로 토큰을 확보·갱신하고 7일치를 존재 여부 확인 없이 그대로 insert 한다.
+     */
+    @Async
+    public void initialSyncForUser(Long userId) {
+        FitbitEntity entity = fitbitRepository.findById(userId).orElse(null);
+        if (entity == null) {
+            log.info("[FitbitSyncService] initial sync skipped userId={} (no fitbit row).", userId);
             return;
         }
+        String accessToken = authService.refreshAndPersist(entity);
+        if (accessToken == null) {
+            log.info("[FitbitSyncService] initial sync skipped userId={} (token invalid).", userId);
+            return;
+        }
+        syncForUser(entity, accessToken, /* skipExistingDays = */ false);
+    }
 
-        LocalDate today = LocalDate.now();
-        LocalDate oldestKeptDate = today.minusDays(6);
-        System.out.println("\n🔄 [Scheduled Sync] Starting full 7-days data refresh...");
-        purgeOlderThan(oldestKeptDate);
+    /**
+     * 한 사용자에 대해 최근 7일 윈도우를 순회한다.
+     * skipExistingDays=true 면 daily_health_summary 가 이미 있는 날짜는 통째로 스킵한다.
+     */
+    private void syncForUser(FitbitEntity entity, String accessToken, boolean skipExistingDays) {
+        Long userId = entity.getUserId();
+        LocalDate today = LocalDate.now(KST);
+        log.info("[FitbitSyncService] sync start userId={} window=({} ~ {}) skipExisting={}",
+                userId, today.minusDays(6), today, skipExistingDays);
 
         for (int i = 6; i >= 0; i--) {
             LocalDate targetDate = today.minusDays(i);
-            String dateStr = targetDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            if (skipExistingDays && summaryRepo.existsByUserIdAndRecordDate(userId, targetDate)) {
+                continue;
+            }
+            String dateStr = targetDate.format(DATE_FMT);
 
-            System.out.println("   ▶ Processing Date: " + dateStr);
-            purgeDate(targetDate);
+            JsonNode sleepNode = authService.callApiAsJson(accessToken,
+                    "https://api.fitbit.com/1.2/user/-/sleep/date/" + dateStr + ".json");
 
-            // 각 API 호출 후 핏빗 서버 보호를 위해 0.5초~1초 정도 짧게 쉽니다.
-            syncDailySummaryAndStages(dateStr, targetDate);
+            syncDailySummaryAndStages(userId, accessToken, dateStr, targetDate, sleepNode);
             sleep(500);
-
-            syncHeartRate(dateStr, targetDate);
+            syncHeartRate(userId, accessToken, dateStr, targetDate);
             sleep(500);
-
-            syncSpO2(dateStr, targetDate);
+            syncSpO2(userId, accessToken, dateStr, targetDate);
             sleep(500);
-
-            syncHrv(dateStr, targetDate);
+            syncHrv(userId, accessToken, dateStr, targetDate);
             sleep(500);
         }
-        System.out.println("✅ [Scheduled Sync] 7-days refresh completed.\n");
+        log.info("[FitbitSyncService] sync done userId={}", userId);
     }
 
     private void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
     }
 
-    private void purgeOlderThan(LocalDate cutoffDate) {
-        summaryRepo.deleteByRecordDateBefore(cutoffDate);
-        hrRepo.deleteByRecordDateBefore(cutoffDate);
-        stageRepo.deleteByRecordDateBefore(cutoffDate);
-        spo2Repo.deleteByRecordDateBefore(cutoffDate);
-        hrvRepo.deleteByRecordDateBefore(cutoffDate);
-    }
-
-    private void purgeDate(LocalDate targetDate) {
-        summaryRepo.deleteById(targetDate);
-        hrRepo.deleteByRecordDate(targetDate);
-        stageRepo.deleteByRecordDate(targetDate);
-        spo2Repo.deleteByRecordDate(targetDate);
-        hrvRepo.deleteByRecordDate(targetDate);
-    }
-
-    // --- 이하 데이터 파싱 및 저장 로직 (이전과 동일) ---
-    // syncDailySummaryAndStages, syncHeartRate, syncSpO2, syncHrv 구현부...
-
-
-    private void syncDailySummaryAndStages(String dateStr, LocalDate targetDate) {
-        JsonNode sleepNode = authService.callApiAsJson("https://api.fitbit.com/1.2/user/-/sleep/date/" + dateStr + ".json");
-        JsonNode brNode = authService.callApiAsJson("https://api.fitbit.com/1/user/-/br/date/" + dateStr + ".json");
-        JsonNode tempNode = authService.callApiAsJson("https://api.fitbit.com/1/user/-/temp/skin/date/" + dateStr + ".json");
+    /** 일일 요약 + 호흡수/체온 + 수면 단계 타임라인을 적재한다. */
+    private void syncDailySummaryAndStages(Long userId, String accessToken, String dateStr,
+            LocalDate targetDate, JsonNode sleepNode) {
+        JsonNode brNode = authService.callApiAsJson(accessToken,
+                "https://api.fitbit.com/1/user/-/br/date/" + dateStr + ".json");
+        JsonNode tempNode = authService.callApiAsJson(accessToken,
+                "https://api.fitbit.com/1/user/-/temp/skin/date/" + dateStr + ".json");
 
         DailyHealthSummary summary = new DailyHealthSummary();
+        summary.setUserId(userId);
         summary.setRecordDate(targetDate);
 
-        // 1. 수면 요약 & 타임라인 파싱
         if (sleepNode != null && sleepNode.has("sleep") && sleepNode.get("sleep").isArray()) {
             for (JsonNode s : sleepNode.get("sleep")) {
-                if (s.get("isMainSleep").asBoolean()) {
-                    summary.setStartTime(s.get("startTime").asText());
-                    summary.setEndTime(s.get("endTime").asText());
-                    summary.setTimeInBed(s.get("timeInBed").asInt());
-                    summary.setMinutesAsleep(s.get("minutesAsleep").asInt());
-                    summary.setMinutesAwake(s.get("minutesAwake").asInt());
-                    summary.setEfficiency(s.get("efficiency").asInt());
+                if (s.path("isMainSleep").asBoolean(false)) {
+                    summary.setStartTime(s.path("startTime").asText(null));
+                    summary.setEndTime(s.path("endTime").asText(null));
+                    summary.setTimeInBed(s.path("timeInBed").asInt(0));
+                    summary.setMinutesAsleep(s.path("minutesAsleep").asInt(0));
+                    summary.setMinutesAwake(s.path("minutesAwake").asInt(0));
+                    summary.setEfficiency(s.path("efficiency").asInt(0));
 
                     JsonNode stages = s.path("levels").path("summary");
                     if (!stages.isMissingNode()) {
@@ -114,16 +154,16 @@ public class FitbitSyncService {
                         summary.setWakeMins(stages.path("wake").path("minutes").asInt(0));
                     }
 
-                    // 수면 타임라인 DB 저장
                     JsonNode timeline = s.path("levels").path("data");
                     if (timeline.isArray()) {
                         for (JsonNode t : timeline) {
-                            SleepStageLog log = new SleepStageLog();
-                            log.setRecordDate(targetDate);
-                            log.setStartTime(t.get("dateTime").asText());
-                            log.setDurationSeconds(t.get("seconds").asInt());
-                            log.setStageLevel(t.get("level").asText());
-                            stageRepo.save(log);
+                            SleepStage row = new SleepStage();
+                            row.setUserId(userId);
+                            row.setRecordDate(targetDate);
+                            row.setStartTime(t.path("dateTime").asText(null));
+                            row.setDurationSeconds(t.path("seconds").asInt(0));
+                            row.setStageLevel(t.path("level").asText(null));
+                            stageRepo.save(row);
                         }
                     }
                     break;
@@ -131,69 +171,72 @@ public class FitbitSyncService {
             }
         }
 
-        // 2. 호흡수 (BR) 파싱
         if (brNode != null && brNode.has("br") && brNode.get("br").isArray() && brNode.get("br").size() > 0) {
-            summary.setBreathingRate(brNode.get("br").get(0).path("value").path("breathingRate").asDouble());
+            summary.setBreathingRate(brNode.get("br").get(0).path("value").path("breathingRate").asDouble(0));
         }
 
-        // 3. 피부 온도 (Skin Temp) 파싱
-        if (tempNode != null && tempNode.has("tempSkin") && tempNode.get("tempSkin").isArray() && tempNode.get("tempSkin").size() > 0) {
-            summary.setSkinTempRelative(tempNode.get("tempSkin").get(0).path("value").path("nightlyRelative").asDouble());
+        if (tempNode != null && tempNode.has("tempSkin") && tempNode.get("tempSkin").isArray()
+                && tempNode.get("tempSkin").size() > 0) {
+            summary.setSkinTempRelative(
+                    tempNode.get("tempSkin").get(0).path("value").path("nightlyRelative").asDouble(0));
         }
 
-        // 종합 요약 DB 저장
         summaryRepo.save(summary);
     }
 
-    private void syncHeartRate(String dateStr, LocalDate targetDate) {
-        JsonNode hrNode = authService.callApiAsJson("https://api.fitbit.com/1/user/-/activities/heart/date/" + dateStr + "/1d/1min.json");
+    /** 분 단위 심박을 적재한다. */
+    private void syncHeartRate(Long userId, String accessToken, String dateStr, LocalDate targetDate) {
+        JsonNode hrNode = authService.callApiAsJson(accessToken,
+                "https://api.fitbit.com/1/user/-/activities/heart/date/" + dateStr + "/1d/1min.json");
         if (hrNode != null && hrNode.has("activities-heart-intraday")) {
             JsonNode dataset = hrNode.get("activities-heart-intraday").get("dataset");
             if (dataset != null && dataset.isArray()) {
                 for (JsonNode data : dataset) {
-                    HeartRateLog log = new HeartRateLog();
-                    log.setRecordDate(targetDate);
-                    log.setRecordTime(data.get("time").asText());
-                    log.setBpm(data.get("value").asInt());
-                    hrRepo.save(log);
+                    HeartRate row = new HeartRate();
+                    row.setUserId(userId);
+                    row.setRecordDate(targetDate);
+                    row.setRecordTime(data.path("time").asText(null));
+                    row.setBpm(data.path("value").asInt(0));
+                    hrRepo.save(row);
                 }
             }
         }
     }
 
-    private void syncSpO2(String dateStr, LocalDate targetDate) {
-        JsonNode spo2Node = authService.callApiAsJson("https://api.fitbit.com/1/user/-/spo2/date/" + dateStr + "/all.json");
-
-        // 수정됨: "minuteData"가 아니라 "minutes" 배열을 찾습니다.
+    /** 분 단위 SpO2 를 적재한다. */
+    private void syncSpO2(Long userId, String accessToken, String dateStr, LocalDate targetDate) {
+        JsonNode spo2Node = authService.callApiAsJson(accessToken,
+                "https://api.fitbit.com/1/user/-/spo2/date/" + dateStr + "/all.json");
         if (spo2Node != null && spo2Node.has("minutes")) {
             JsonNode minutes = spo2Node.get("minutes");
             if (minutes != null && minutes.isArray()) {
                 for (JsonNode data : minutes) {
-                    SpO2Log log = new SpO2Log();
-                    log.setRecordDate(targetDate);
-                    // Sandbox 구조: { "minute": "2021-10-01T00:00:00", "value": 96.5 }
-                    log.setRecordTime(data.path("minute").asText());
-                    log.setSpo2Value(data.path("value").asDouble());
-                    spo2Repo.save(log);
+                    SpO2 row = new SpO2();
+                    row.setUserId(userId);
+                    row.setRecordDate(targetDate);
+                    row.setRecordTime(data.path("minute").asText(null));
+                    row.setSpo2Value(data.path("value").asDouble(0));
+                    spo2Repo.save(row);
                 }
             }
         }
     }
 
-    private void syncHrv(String dateStr, LocalDate targetDate) {
-        JsonNode hrvNode = authService.callApiAsJson("https://api.fitbit.com/1/user/-/hrv/date/" + dateStr + "/all.json");
-
-        if (hrvNode != null && hrvNode.has("hrv") && hrvNode.get("hrv").isArray() && hrvNode.get("hrv").size() > 0) {
-            // 수정됨: "minuteData"가 아니라 "minutes" 배열을 찾습니다.
+    /** 분 단위 HRV(rmssd) 를 적재한다. */
+    private void syncHrv(Long userId, String accessToken, String dateStr, LocalDate targetDate) {
+        JsonNode hrvNode = authService.callApiAsJson(accessToken,
+                "https://api.fitbit.com/1/user/-/hrv/date/" + dateStr + "/all.json");
+        if (hrvNode != null && hrvNode.has("hrv") && hrvNode.get("hrv").isArray()
+                && hrvNode.get("hrv").size() > 0) {
             JsonNode minutes = hrvNode.get("hrv").get(0).get("minutes");
             if (minutes != null && minutes.isArray()) {
                 for (JsonNode data : minutes) {
-                    HrvLog log = new HrvLog();
-                    log.setRecordDate(targetDate);
-                    log.setRecordTime(data.path("minute").asText());
-                    // Sandbox 구조: "value" 객체 안에 "rmssd"가 있음
-                    log.setRmssdValue(data.path("value").path("rmssd").asDouble());
-                    hrvRepo.save(log);
+                    Hrv row = new Hrv();
+                    row.setUserId(userId);
+                    row.setRecordDate(targetDate);
+                    row.setRecordTime(data.path("minute").asText(null));
+                    row.setRmssdValue(data.path("value").path("rmssd").asDouble(0));
+                    hrvRepo.save(row);
                 }
             }
         }

@@ -24,16 +24,21 @@ import java.time.LocalDateTime;
 public class FitbitEntity {
 
     @Id
-    private String fitbitUserId;
-
+    @Column(name = "user_id")
     private Long userId;
-    private String fitbitUserPassword;
+
+    @Column(name = "fitbit_access_token", columnDefinition = "TEXT")
     private String fitbitAccessToken;
+
+    @Column(name = "fitbit_refresh_token", columnDefinition = "TEXT")
     private String fitbitRefreshToken;
+
     private LocalDateTime fitbitTokenExpiresAt;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
     @UpdateTimestamp
     @Column(nullable = false)
     private LocalDateTime updatedAt;

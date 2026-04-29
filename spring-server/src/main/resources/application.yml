@@ -126,4 +126,6 @@ spring:
 
 app:
   frontend-origin: ${FRONTEND_ORIGIN:*}
+  fitbit:
+    sync-interval-ms: ${FITBIT_SYNC_INTERVAL_MS:900000}
 
