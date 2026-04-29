@@ -23,7 +23,9 @@ import java.util.Objects;
 @Entity
 @Table(name = "daily_health_summary")
 @IdClass(DailyHealthSummary.PK.class)
-@Getter @Setter @NoArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
 public class DailyHealthSummary {
 
     @Id
@@ -70,8 +72,10 @@ public class DailyHealthSummary {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof PK pk)) return false;
+            if (this == o)
+                return true;
+            if (!(o instanceof PK pk))
+                return false;
             return Objects.equals(userId, pk.userId) && Objects.equals(recordDate, pk.recordDate);
         }
 
