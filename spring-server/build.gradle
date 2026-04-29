@@ -49,8 +49,8 @@ dependencies {
 	// .env
 	implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 
-	// H2
-	runtimeOnly 'com.h2database:h2'
+	// MQTT 
+	implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
