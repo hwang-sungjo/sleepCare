@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Lock, CheckCircle2, Watch, Key } from 'lucide-react';
+import { User, Lock, CheckCircle2 } from 'lucide-react';
 import PageWrapper from '../layouts/PageWrapper';
 import Button from '../components/Button';
 import InputField from '../components/InputField';
@@ -10,8 +10,6 @@ interface SignupPageProps {
         nickname: string,
         password: string,
         passwordConfirm: string,
-        fitbitUserId: string,
-        fitbitUserPassword: string,
     ) => void;
     onBack: () => void;
 }
@@ -44,12 +42,10 @@ const SignupPage: React.FC<SignupPageProps> = ({ notification, onSignup, onBack 
     const [nickname, setNickname] = useState('');
     const [password, setPassword] = useState('');
     const [passwordConfirm, setPasswordConfirm] = useState('');
-    const [fitbitUserId, setFitbitUserId] = useState('');
-    const [fitbitUserPassword, setFitbitUserPassword] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSignup(nickname, password, passwordConfirm, fitbitUserId, fitbitUserPassword);
+        onSignup(nickname, password, passwordConfirm);
     };
 
     const nicknameHint = validateNickname(nickname);
@@ -93,28 +89,6 @@ const SignupPage: React.FC<SignupPageProps> = ({ notification, onSignup, onBack 
                     hint={confirmHint.hint}
                     hintType={confirmHint.type}
                 />
-
-                <div className="mt-2 mb-4 px-4 py-3 rounded-2xl bg-indigo-900/20 border border-indigo-500/20">
-                    <p className="text-xs text-indigo-200/80">
-                        Fitbit 계정 연동 (선택) — 수면 데이터 자동 동기화에 사용됩니다.
-                    </p>
-                </div>
-                <InputField
-                    label="Fitbit 아이디"
-                    placeholder="(선택) Fitbit 계정 ID"
-                    icon={Watch}
-                    value={fitbitUserId}
-                    onChange={(e) => setFitbitUserId(e.target.value)}
-                />
-                <InputField
-                    label="Fitbit 비밀번호"
-                    type="password"
-                    placeholder="(선택) Fitbit 계정 비밀번호"
-                    icon={Key}
-                    value={fitbitUserPassword}
-                    onChange={(e) => setFitbitUserPassword(e.target.value)}
-                />
-
                 <div className="mt-auto">
                     <Button type="submit">계정 생성하기</Button>
                 </div>
