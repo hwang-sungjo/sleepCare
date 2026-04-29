@@ -42,8 +42,6 @@ export default function App() {
         signupNickname: string,
         signupPassword: string,
         signupPasswordConfirm: string,
-        fitbitUserId: string,
-        fitbitUserPassword: string,
     ) => {
         if (!signupNickname || !signupPassword) {
             showNotification('닉네임과 비밀번호를 입력해주세요.');
@@ -57,8 +55,6 @@ export default function App() {
             const res = await apiSignup({
                 nickname: signupNickname,
                 password: signupPassword,
-                fitbitUserId,
-                fitbitUserPassword,
             });
             // 원격 백엔드는 회원가입 시 즉시 토큰을 발급합니다.
             setToken(res.jwt);
