@@ -58,3 +58,7 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+bootRun {
+	args = ["--spring.profiles.active=${project.findProperty('profile') ?: 'local-h2'}"]
+}
