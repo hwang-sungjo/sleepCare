@@ -1,4 +1,4 @@
-package project.server.dao.entity;
+package project.server.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -6,45 +6,37 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+/**
+ * Fitbit 분 단위 HRV(rmssd) 기록.
+ * 기상 시점에 daily 1회 일괄 적재 후 그 날에는 갱신되지 않는다.
+ */
 @Entity
-@Table(name = "fitbit_data")
-public class FitbitDataEntity {
+@Table(name = "hrv")
+@Getter @Setter @NoArgsConstructor
+public class Hrv {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long fitbitDataId;
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     private Long userId;
-    private Instant segmentStart;
-    private Instant segmentEnd;
-    private String sleepStage;
+    private LocalDate recordDate;
+    private String recordTime;
+    private Double rmssdValue;
 
-    /** Heart rate variability in milliseconds where available */
-    private BigDecimal hrvMs;
-
-    private Integer restingHrBpm;
-    private String payloadJson;
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
+
     @UpdateTimestamp
     @Column(nullable = false)
     private Instant updatedAt;
-
 }

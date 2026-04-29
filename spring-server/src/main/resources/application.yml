@@ -126,4 +126,15 @@ spring:
 
 app:
   frontend-origin: ${FRONTEND_ORIGIN:*}
+  fitbit:
+    sync-interval-ms: ${FITBIT_SYNC_INTERVAL_MS:900000}
+  mqtt:
+    broker-url: ${MQTT_BROKER_URL:tcp://192.168.1.189:1883}
+    client-id: ${MQTT_CLIENT_ID:sleepcare-server}
+    topic: ${MQTT_TOPIC:iot/sensor/room/sumin}
+    target-user-id: ${MQTT_TARGET_USER_ID:1}
+    alarm:
+      client-id: ${MQTT_ALARM_CLIENT_ID:sleepcare-alarm}
+      topic: ${MQTT_ALARM_TOPIC:iot/alarm/control}
+      toggle-interval-ms: ${MQTT_ALARM_TOGGLE_MS:2000}
 

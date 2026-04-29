@@ -3,7 +3,6 @@ package project.server.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import project.server.common.exception.UserException;
-import project.server.common.exception.jwt.unauthorized.JwtUnauthorizedTokenException;
 import project.server.dao.UserRepository;
 import project.server.dao.entity.UserEntity;
 import project.server.dto.auth.LoginRequest;
@@ -32,7 +31,7 @@ public class AuthService {
         long userId = userRepository
                 .findByNickname(nickname)
                 .map(UserEntity::getUserId)
-                .orElseThrow(() -> new UserException(EMAIL_NOT_FOUND));
+                .orElseThrow(() -> new UserException(USER_NOT_FOUND));
 
         validatePassword(authRequest.getPassword(), userId);
 
@@ -43,17 +42,11 @@ public class AuthService {
 
     private void validatePassword(String password, long userId) {
         String encodedPassword = userRepository.findById(userId)
-                .orElseThrow(() -> new UserException(EMAIL_NOT_FOUND))
+                .orElseThrow(() -> new UserException(USER_NOT_FOUND))
                 .getPassword();
         if (!passwordEncoder.matches(password, encodedPassword)) {
             throw new UserException(PASSWORD_NO_MATCH);
         }
     }
 
-    public long getUserIdByEmail(String email) {
-        return userRepository
-                .findByNickname(email)
-                .map(UserEntity::getUserId)
-                .orElseThrow(() -> new JwtUnauthorizedTokenException(TOKEN_MISMATCH));
-    }
 }

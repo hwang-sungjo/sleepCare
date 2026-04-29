@@ -5,22 +5,29 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import project.server.dao.FitbitDataRepository;
-import project.server.dao.SensorDataRepository;
+import project.server.dao.DailyHealthSummaryRepository;
+import project.server.dao.RealtimeMetricRepository;
 import project.server.dto.dashboard.GetSleepDashboardResponse;
+import project.server.entity.DailyHealthSummary;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.DoubleSummaryStatistics;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
 
-    private final FitbitDataRepository fitbitDataRepository;
-    private final SensorDataRepository sensorDataRepository;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    private final DailyHealthSummaryRepository summaryRepository;
+    private final RealtimeMetricRepository realtimeMetricRepository;
 
     public GetSleepDashboardResponse dashboard(long userId) {
-        int efficiency = deriveEfficiencyGuess(userId);
-        int avgMinutes = deriveAvgSleepGuess(userId);
+        Optional<DailyHealthSummary> latest = findLatestSummary(userId);
+        int efficiency = latest.map(DailyHealthSummary::getEfficiency).orElse(0);
+        int avgMinutes = latest.map(DailyHealthSummary::getMinutesAsleep).orElse(0);
         String hint = environmentHint(userId);
 
         return GetSleepDashboardResponse.builder()
@@ -30,16 +37,21 @@ public class DashboardService {
                 .build();
     }
 
-    private int deriveEfficiencyGuess(long userId) {
-        return fitbitDataRepository.countByUserId(userId) > 0 ? 92 : 0;
-    }
-
-    private int deriveAvgSleepGuess(long userId) {
-        return fitbitDataRepository.countByUserId(userId) > 0 ? 440 : 0;
+    /** 가장 최근 7일 안에서 가장 최신 daily summary 한 건을 가져온다. */
+    private Optional<DailyHealthSummary> findLatestSummary(long userId) {
+        LocalDate today = LocalDate.now(KST);
+        for (int i = 0; i <= 6; i++) {
+            Optional<DailyHealthSummary> hit =
+                    summaryRepository.findByUserIdAndRecordDate(userId, today.minusDays(i));
+            if (hit.isPresent()) {
+                return hit;
+            }
+        }
+        return Optional.empty();
     }
 
     private String environmentHint(long userId) {
-        var page = sensorDataRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, 12));
+        var page = realtimeMetricRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, 12));
         if (page.isEmpty()) {
             return "실내 데이터가 아직 충분하지 않습니다.";
         }
@@ -62,7 +74,7 @@ public class DashboardService {
                 page.stream().map(s -> s.getIlluminance()).filter(java.util.Objects::nonNull).mapToDouble(v -> v)
                         .average().orElse(0d);
         if (avgLux > 200d) {
-            return "취침 전 시간대 조도가 높았습니다. 암막 또는 차광 블라인드를 활용하면 멜라토닝 분비에 도움이 됩니다.";
+            return "취침 전 시간대 조도가 높았습니다. 암막 또는 차광 블라인드를 활용하면 멜라토닌 분비에 도움이 됩니다.";
         }
         return "환경 신호가 안정적입니다. 같은 조건으로 수면 루틴을 유지해 보세요.";
     }
