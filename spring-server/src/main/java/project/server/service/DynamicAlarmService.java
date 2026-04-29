@@ -6,6 +6,7 @@ import project.server.dao.AlarmRepository;
 import project.server.dao.SleepStageRepository;
 import project.server.dao.entity.AlarmEntity;
 import project.server.entity.SleepStage;
+import project.server.util.AlarmWakeAtHelper;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,19 +49,21 @@ public class DynamicAlarmService {
     public void recalculateForUser(Long userId) {
         int todayDay = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();
         AlarmEntity alarm = alarmRepository.findByUserIdAndDayOfWeek(userId, todayDay).orElse(null);
-        if (alarm == null || Boolean.FALSE.equals(alarm.getAdaptiveEnabled())) {
+        if (alarm == null) {
+            return;
+        }
+        if (Boolean.FALSE.equals(alarm.getAdaptiveEnabled())) {
+            alarm.setDynamicWakeAt(
+                    AlarmWakeAtHelper.todayWakeInstant(alarm.getBaseWakeTime(), DEFAULT_ZONE));
+            alarmRepository.save(alarm);
             return;
         }
         Instant now = Instant.now();
         Instant windowEnd = calculateWindowEndInstant(alarm, now);
-        if (windowEnd == null) {
-            alarm.setDynamicWakeAt(null);
-            alarmRepository.save(alarm);
-            return;
-        }
-        // 오늘 알람이 이미 울렸다면 다이나믹 값을 제거해 다음 주 동일 요일에서 다시 계산한다.
+        // 오늘 알람이 이미 울렸다면 다음 주 동일 요일 기준 시각으로 옮긴다.
         if (hasRungAlready(alarm, now, windowEnd)) {
-            alarm.setDynamicWakeAt(null);
+            alarm.setDynamicWakeAt(AlarmWakeAtHelper.nextWeeklyWakeInstant(
+                    alarm.getDayOfWeek(), alarm.getBaseWakeTime(), DEFAULT_ZONE));
             alarmRepository.save(alarm);
             return;
         }

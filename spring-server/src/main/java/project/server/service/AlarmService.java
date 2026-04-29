@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import project.server.dao.AlarmRepository;
 import project.server.dao.entity.AlarmEntity;
 import project.server.dto.alarm.DailyAlarmItemResponse;
+import project.server.util.AlarmWakeAtHelper;
 import project.server.dto.alarm.GetAlarmResponse;
 import project.server.dto.alarm.PatchAlarmRequest;
 
@@ -13,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -56,14 +56,18 @@ public class AlarmService {
         if (request.getBaseWakeTime() != null && !request.getBaseWakeTime().isBlank()) {
             alarm.setBaseWakeTime(LocalTime.parse(request.getBaseWakeTime(), TIME_FMT));
         }
-        // 다이나믹 알람은 "오늘" 항목에만 유지/계산한다.
-        if (alarm.getDayOfWeek() != LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue()) {
-            alarm.setDynamicWakeAt(null);
+        int todayDow = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();
+        if (alarm.getDayOfWeek() == todayDow) {
+            if (!Boolean.TRUE.equals(request.getRecomputeDynamicNow())) {
+                alarm.setDynamicWakeAt(AlarmWakeAtHelper.todayWakeInstant(alarm.getBaseWakeTime(), DEFAULT_ZONE));
+            }
+        } else {
+            alarm.setDynamicWakeAt(AlarmWakeAtHelper.nearestOccurrenceWakeInstant(
+                    alarm.getDayOfWeek(), alarm.getBaseWakeTime(), DEFAULT_ZONE));
         }
         alarmRepository.save(alarm);
 
-        if (Boolean.TRUE.equals(request.getRecomputeDynamicNow())
-                && alarm.getDayOfWeek() == LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue()) {
+        if (Boolean.TRUE.equals(request.getRecomputeDynamicNow()) && alarm.getDayOfWeek() == todayDow) {
             dynamicAlarmService.recalculateForUser(userId);
         }
         List<AlarmEntity> alarms = alarmRepository.findAllByUserIdOrderByDayOfWeekAsc(userId);
@@ -86,11 +90,12 @@ public class AlarmService {
     }
 
     private static AlarmEntity defaultAlarm(Long userId, int dayOfWeek) {
+        LocalTime base = LocalTime.of(7, 30);
         return AlarmEntity.builder()
                 .userId(userId)
                 .dayOfWeek(dayOfWeek)
-                .baseWakeTime(LocalTime.of(7, 30))
-                .dynamicWakeAt(null)
+                .baseWakeTime(base)
+                .dynamicWakeAt(AlarmWakeAtHelper.nearestOccurrenceWakeInstant(dayOfWeek, base, DEFAULT_ZONE))
                 .adaptiveEnabled(true)
                 .windowMinutesBefore(30)
                 .build();
@@ -100,13 +105,7 @@ public class AlarmService {
         return alarms.stream()
                 .filter(a -> a.getDayOfWeek() == todayDay)
                 .findFirst()
-                .map(a -> {
-                    if (a.getDynamicWakeAt() != null) {
-                        return a.getDynamicWakeAt();
-                    }
-                    LocalDate today = LocalDate.now(DEFAULT_ZONE);
-                    return LocalDateTime.of(today, a.getBaseWakeTime()).atZone(DEFAULT_ZONE).toInstant();
-                })
+                .map(AlarmEntity::getDynamicWakeAt)
                 .orElse(null);
     }
 

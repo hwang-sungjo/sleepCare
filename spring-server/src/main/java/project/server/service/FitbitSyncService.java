@@ -194,9 +194,16 @@ public class FitbitSyncService {
         }
     }
 
-    /** 일일 요약 + 호흡수/체온 + 수면 단계 타임라인을 적재한다. */
+    /** 일일 요약 + 호흡수/체온 + 수면 단계 타임라인을 적재한다. 본 수면(main sleep) 구간 정보가 불충분하면 저장하지 않는다. */
     private void syncDailySummaryAndStages(Long userId, String accessToken, String dateStr,
             LocalDate targetDate, JsonNode sleepNode) {
+        JsonNode mainSleep = extractMainSleep(sleepNode);
+        if (!isPersistableMainSleep(mainSleep)) {
+            log.debug(
+                    "[FitbitSyncService] skip daily_health_summary sleep stages userId={} date={} (no complete main sleep)",
+                    userId, targetDate);
+            return;
+        }
         JsonNode brNode = authService.callApiAsJson(accessToken,
                 "https://api.fitbit.com/1/user/-/br/date/" + dateStr + ".json");
         JsonNode tempNode = authService.callApiAsJson(accessToken,
@@ -206,52 +213,78 @@ public class FitbitSyncService {
         summary.setUserId(userId);
         summary.setRecordDate(targetDate);
 
-        if (sleepNode != null && sleepNode.has("sleep") && sleepNode.get("sleep").isArray()) {
-            for (JsonNode s : sleepNode.get("sleep")) {
-                if (s.path("isMainSleep").asBoolean(false)) {
-                    summary.setStartTime(s.path("startTime").asText(null));
-                    summary.setEndTime(s.path("endTime").asText(null));
-                    summary.setTimeInBed(s.path("timeInBed").asInt(0));
-                    summary.setMinutesAsleep(s.path("minutesAsleep").asInt(0));
-                    summary.setMinutesAwake(s.path("minutesAwake").asInt(0));
-                    summary.setEfficiency(s.path("efficiency").asInt(0));
+        String startRaw = mainSleep.path("startTime").asText("").trim();
+        String endRaw = mainSleep.path("endTime").asText("").trim();
+        summary.setStartTime(startRaw);
+        summary.setEndTime(endRaw);
 
-                    JsonNode stages = s.path("levels").path("summary");
-                    if (!stages.isMissingNode()) {
-                        summary.setDeepMins(stages.path("deep").path("minutes").asInt(0));
-                        summary.setLightMins(stages.path("light").path("minutes").asInt(0));
-                        summary.setRemMins(stages.path("rem").path("minutes").asInt(0));
-                        summary.setWakeMins(stages.path("wake").path("minutes").asInt(0));
-                    }
+        summary.setTimeInBed(mainSleep.path("timeInBed").asInt(0));
+        summary.setMinutesAsleep(mainSleep.path("minutesAsleep").asInt(0));
+        summary.setMinutesAwake(mainSleep.path("minutesAwake").asInt(0));
+        summary.setEfficiency(mainSleep.path("efficiency").asInt(0));
 
-                    JsonNode timeline = s.path("levels").path("data");
-                    if (timeline.isArray()) {
-                        for (JsonNode t : timeline) {
-                            SleepStage row = new SleepStage();
-                            row.setUserId(userId);
-                            row.setRecordDate(targetDate);
-                            row.setStartTime(t.path("dateTime").asText(null));
-                            row.setDurationSeconds(t.path("seconds").asInt(0));
-                            row.setStageLevel(t.path("level").asText(null));
-                            stageRepo.save(row);
-                        }
-                    }
-                    break;
-                }
+        JsonNode stageSummary = mainSleep.path("levels").path("summary");
+        if (!stageSummary.isMissingNode()) {
+            summary.setDeepMins(stageSummary.path("deep").path("minutes").asInt(0));
+            summary.setLightMins(stageSummary.path("light").path("minutes").asInt(0));
+            summary.setRemMins(stageSummary.path("rem").path("minutes").asInt(0));
+            summary.setWakeMins(stageSummary.path("wake").path("minutes").asInt(0));
+        }
+
+        summary.setBreathingRate(extractBreathingRate(brNode));
+        summary.setSkinTempRelative(extractSkinTempRelative(tempNode));
+
+        JsonNode timeline = mainSleep.path("levels").path("data");
+        if (timeline.isArray()) {
+            for (JsonNode t : timeline) {
+                SleepStage row = new SleepStage();
+                row.setUserId(userId);
+                row.setRecordDate(targetDate);
+                row.setStartTime(t.path("dateTime").asText(null));
+                row.setDurationSeconds(t.path("seconds").asInt(0));
+                row.setStageLevel(t.path("level").asText(null));
+                stageRepo.save(row);
             }
         }
 
-        if (brNode != null && brNode.has("br") && brNode.get("br").isArray() && brNode.get("br").size() > 0) {
-            summary.setBreathingRate(brNode.get("br").get(0).path("value").path("breathingRate").asDouble(0));
-        }
+        summaryRepo.save(summary);
+    }
 
+    /** Fitbit 목록 내 본수면 레코드를 찾거나 null. */
+    private static JsonNode extractMainSleep(JsonNode sleepNode) {
+        if (sleepNode == null || !sleepNode.has("sleep") || !sleepNode.get("sleep").isArray()) {
+            return null;
+        }
+        for (JsonNode s : sleepNode.get("sleep")) {
+            if (s.path("isMainSleep").asBoolean(false)) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isPersistableMainSleep(JsonNode mainSleep) {
+        if (mainSleep == null) {
+            return false;
+        }
+        String start = mainSleep.path("startTime").asText(null);
+        String end = mainSleep.path("endTime").asText(null);
+        return start != null && !start.isBlank() && end != null && !end.isBlank();
+    }
+
+    private static double extractBreathingRate(JsonNode brNode) {
+        if (brNode != null && brNode.has("br") && brNode.get("br").isArray() && brNode.get("br").size() > 0) {
+            return brNode.get("br").get(0).path("value").path("breathingRate").asDouble(0);
+        }
+        return 0d;
+    }
+
+    private static double extractSkinTempRelative(JsonNode tempNode) {
         if (tempNode != null && tempNode.has("tempSkin") && tempNode.get("tempSkin").isArray()
                 && tempNode.get("tempSkin").size() > 0) {
-            summary.setSkinTempRelative(
-                    tempNode.get("tempSkin").get(0).path("value").path("nightlyRelative").asDouble(0));
+            return tempNode.get("tempSkin").get(0).path("value").path("nightlyRelative").asDouble(0);
         }
-
-        summaryRepo.save(summary);
+        return 0d;
     }
 
     /** 일별 전체 1분 intraday 한 번에 받아 존재하지 않는 행만 insert. */
