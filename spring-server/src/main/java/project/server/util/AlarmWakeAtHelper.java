@@ -9,7 +9,9 @@ import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 
 /**
- * 요일별 알람의 {@code dynamic_wake_at} 에 넣을 기준 {@link Instant} 계산 (KST 등 zone 기준).
+ * 요일별 알람 행에서 {@code dynamic_wake_at} 채우기용 {@link Instant} 계산 도우미.
+ * 모든 오버로드는 호출부가 명시적으로 넘긴 {@link ZoneId}(주로 Seoul) 과 {@link LocalTime} 을 묶어 Zoned 순간으로 만든 뒤
+ * UTC 순간으로 축약한다.
  */
 public final class AlarmWakeAtHelper {
 

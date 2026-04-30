@@ -14,25 +14,16 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 라즈베리파이 알람 스피커 제어용 MQTT 발행자.
+ * 알람 디바이스용 MQTT 명령 발행 클라이언트(QoS 1, retained 미사용).
  *
  * <p>
- * 라즈베리파이 측에서는 {@code iot/alarm/control} 토픽을 구독하면서
- * {@code "ON"} / {@code "OFF"} 페이로드에 따라 PWM 스피커를 켜고 끈다.
- * 이 컴포넌트는 서버 부팅 직후부터 일정 주기({@code app.mqtt.alarm.toggle-interval-ms},
- * 기본 2초)로 두 명령을 번갈아 발행하여 하드웨어 연결을 검증하는
- * <b>임시 데모 트리거</b> 역할을 한다.
+ * 구독 측은 설정 토픽에서 UTF-8 페이로드 {@code ON} / {@code OFF} 를 수신해 부저·PWM 등 하드웨어를 구동한다.
+ * {@link MqttSensorSubscriber} 와 같은 브로커를 쓰되 {@code client-id} 는 별도로 두어 두 연결을 분리한다.
  * </p>
  *
  * <p>
- * 실제 운영에서는 {@code @Scheduled} 토글 메서드를 제거하고,
- * 동적 알람 시각 도달 시점에 {@link #publish(String)} 을 한 번씩 호출하는 형태로
- * 교체하면 된다.
- * </p>
- *
- * <p>
- * 센서 구독자({@code MqttSensorSubscriber})와 같은 브로커를 쓰지만 client-id 가
- * 다르므로 두 연결이 서로를 끊지 않는다.
+ * 연결 상태 점검을 위해 스케줄에서 ON/OFF 를 주기적으로 번갈아 보내는 경로가 있으며,
+ * 비즈니스 알람 발생 시에는 {@link #publish(String)} 으로 단발 제어하면 된다.
  * </p>
  */
 @Slf4j
@@ -52,7 +43,8 @@ public class MqttAlarmPublisher {
     private String topic;
 
     private MqttClient client;
-    private boolean alarmOn = false;
+    /** 현재 순서에 따라 다음에 보낼 명령이 ON 인지 표시한다(토글 발행 전용). */
+    private boolean nextCommandIsOn = true;
 
     @PostConstruct
     public void start() {
@@ -90,8 +82,7 @@ public class MqttAlarmPublisher {
     }
 
     /**
-     * 임의의 명령을 알람 토픽으로 발행한다 (QoS 1, retained=false).
-     * 단발 트리거에 사용.
+     * 알람 제어 토픽으로 임의 페이로드를 발행한다(연결되어 있지 않으면 무시 후 로그).
      */
     public void publish(String command) {
         if (client == null || !client.isConnected()) {
@@ -107,15 +98,14 @@ public class MqttAlarmPublisher {
     }
 
     /**
-     * 데모용 토글 발행. {@code app.mqtt.alarm.toggle-interval-ms} 주기로
-     * ON ↔ OFF 를 번갈아 보낸다. 운영 전환 시 이 메서드를 제거하면 된다.
+     * {@code app.mqtt.alarm.toggle-interval-ms} 간격으로 ON 과 OFF 를 번갈아 발행해 구독 측 연동을 검증한다.
      */
     @Scheduled(fixedRateString = "${app.mqtt.alarm.toggle-interval-ms:2000}")
     public void publishToggle() {
         if (client == null || !client.isConnected()) {
             return;
         }
-        alarmOn = !alarmOn;
-        publish(alarmOn ? CMD_OFF : CMD_OFF);
+        publish(nextCommandIsOn ? CMD_ON : CMD_OFF);
+        nextCommandIsOn = !nextCommandIsOn;
     }
 }

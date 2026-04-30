@@ -5,9 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import project.server.dao.AlarmRepository;
 import project.server.dao.entity.AlarmEntity;
 import project.server.dto.alarm.DailyAlarmItemResponse;
-import project.server.util.AlarmWakeAtHelper;
 import project.server.dto.alarm.GetAlarmResponse;
 import project.server.dto.alarm.PatchAlarmRequest;
+import project.server.util.AlarmWakeAtHelper;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +20,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.IntStream;
 
+/**
+ * 요일별 기상 알람(사용자당 최대 7건) 조회 및 설정 변경.
+ *
+ * <p>
+ * 날짜·요일 판별은 서울({@link ZoneId#of(String) Asia/Seoul}) 고정이다.
+ * DB의 {@code base_wake_time} 은 같은 시각을 매 주 반복하는 패턴을 뜻하는 {@link LocalTime}이며,
+ * {@code dynamic_wake_at} 은 그 패턴을 특정 일자와 합산해 계산된 실제 울림 후보 시각이다.
+ * </p>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,6 +40,9 @@ public class AlarmService {
     private final AlarmRepository alarmRepository;
     private final DynamicAlarmService dynamicAlarmService;
 
+    /**
+     * 미보유 요일 알람 행을 채운 뒤 동적 알람을 재계산하고, 전체 목록과 오늘의 유효 기상 시각을 반환한다.
+     */
     public GetAlarmResponse getAlarm(long userId) {
         ensureWeeklyAlarms(userId);
         dynamicAlarmService.recalculateForUser(userId);
@@ -40,6 +52,10 @@ public class AlarmService {
         return toResponse(alarms, todayDay, effective);
     }
 
+    /**
+     * 지정 요일 행을 갱신한다. 적응형 옵션·기준 시각·윈도우 분 변경 시 동일 트랜잭션에서 저장하고,
+     * 오늘 요일만 {@code recomputeDynamicNow}=true 로 적응형 재계산을 요청할 수 있다.
+     */
     @Transactional
     public GetAlarmResponse patchAlarm(long userId, PatchAlarmRequest request) {
         ensureWeeklyAlarms(userId);
@@ -76,6 +92,9 @@ public class AlarmService {
         return toResponse(alarms, todayDay, effective);
     }
 
+    /**
+     * ISO 요일 1~7 각각 한 행씩 존재하도록 없는 슬롯만 기본값으로 생성한다.
+     */
     @Transactional
     protected void ensureWeeklyAlarms(long userId) {
         List<AlarmEntity> alarms = alarmRepository.findAllByUserIdOrderByDayOfWeekAsc(userId);
@@ -89,6 +108,7 @@ public class AlarmService {
         });
     }
 
+    /** 새 요일 슬롯의 기준 시각을 07:30으로 두고, 해당 요일에 가까운 발생 시각을 동적값으로 채운다. */
     private static AlarmEntity defaultAlarm(Long userId, int dayOfWeek) {
         LocalTime base = LocalTime.of(7, 30);
         return AlarmEntity.builder()
@@ -101,6 +121,10 @@ public class AlarmService {
                 .build();
     }
 
+    /**
+     * 오늘 요일에 해당하는 알람 행의 {@link AlarmEntity#getDynamicWakeAt()} 을 반환한다.
+     * 행이 없으면 null.
+     */
     private static Instant resolveTodayEffectiveWakeAt(List<AlarmEntity> alarms, int todayDay) {
         return alarms.stream()
                 .filter(a -> a.getDayOfWeek() == todayDay)

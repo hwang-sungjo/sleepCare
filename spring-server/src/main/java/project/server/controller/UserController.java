@@ -80,7 +80,9 @@ public class UserController {
 
     @Operation(
             summary = "회원 가입",
-            description = "닉네임/비밀번호로 사용자를 생성하고 즉시 사용 가능한 JWT를 반환합니다.")
+            description =
+                    "닉네임·비밀번호로 사용자를 생성하고 즉시 JWT 를 돌려줍니다. 동일 트랜잭션에서 요일별 알람 7건과 "
+                            + "Fitbit 토큰 보관 행이 함께 생성되며, 커밋 직후 Fitbit 초기 동기 비동기 작업이 등록된다.")
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",

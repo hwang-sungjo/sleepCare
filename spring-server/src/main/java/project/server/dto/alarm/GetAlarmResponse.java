@@ -18,7 +18,7 @@ public class GetAlarmResponse {
     private Integer todayDayOfWeek;
 
     @Schema(
-            description = "오늘 실제로 사용되는 기상 시각(동적 우선, 없으면 기본 시각 기반)",
+            description = "오늘 요일 알람 행이 있으면 그 행의 dynamic_wake_at 순간.",
             example = "2026-04-29T22:15:00Z",
             nullable = true)
     private Instant todayEffectiveWakeAt;

@@ -32,7 +32,8 @@ public class AuthController {
 
         private final AuthService authService;
 
-        @Operation(summary = "로그인", description = "닉네임과 비밀번호를 검증하고 JWT를 발급합니다.")
+        @Operation(summary = "로그인", description =
+                        "등록된 닉네임에 대해 BCrypt 검증 후 서명된 JWT(Access)를 포함한 응답을 준다.")
         @ApiResponses({
                         @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
                         @ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 사용자/비밀번호 불일치", content = @Content(schema = @Schema(implementation = BaseErrorResponse.class), examples = {

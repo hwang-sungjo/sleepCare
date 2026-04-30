@@ -40,7 +40,12 @@ public class AlarmController {
 
     private final AlarmService alarmService;
 
-    @Operation(summary = "알람 조회", description = "현재 로그인 사용자의 기본 기상시간과 동적 알람 계산 결과를 조회합니다.", security = @SecurityRequirement(name = "bearerAuth"))
+    @Operation(
+            summary = "알람 조회",
+            description =
+                    "요일당 1행씩 저장된 설정을 불러오고 오늘 날짜(Asia/Seoul) 요일 행 기준 동적 알람을 재계산합니다. "
+                            + "`todayEffectiveWakeAt`은 오늘 요일 행의 `dynamicWakeAt`(없거나 행이 없으면 null)입니다.",
+            security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(schema = @Schema(implementation = GetAlarmResponse.class))),
             @ApiResponse(
@@ -66,7 +71,12 @@ public class AlarmController {
         return new BaseResponse<>(alarmService.getAlarm(userId));
     }
 
-    @Operation(summary = "알람 설정 변경", description = "기본 기상시간, 적응형 모드, 탐색 윈도우를 변경하고 필요 시 동적 알람을 재계산합니다.", security = @SecurityRequirement(name = "bearerAuth"))
+    @Operation(
+            summary = "알람 설정 변경",
+            description =
+                    "기본 벽시계 시각(LocalTime 문자열)·적응형 토글·탐색 윈도 분을 갱신하고, 오늘이 대상 요일이면 즉시 "
+                            + "유효 dynamic_wake_at 을 채운 뒤 선택적으로 재계산 API를 타게 한다.",
+            security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공", content = @Content(schema = @Schema(implementation = GetAlarmResponse.class))),
             @ApiResponse(

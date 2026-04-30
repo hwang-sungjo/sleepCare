@@ -35,9 +35,11 @@ public class DailyHealthSummary {
     @Id
     private LocalDate recordDate;
 
+    /** 본수면(main sleep) 시작 인스턴트 — Fitbit 응답 문자열에서 변환하여 저장한다. */
     @Column(nullable = false)
     private Instant startTime;
 
+    /** 본수면(main sleep) 종료 인스턴트 — 시작과 동일한 방식으로 파싱된다. */
     @Column(nullable = false)
     private Instant endTime;
 
