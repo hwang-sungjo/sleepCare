@@ -24,11 +24,13 @@ import java.time.Instant;
 import java.util.Base64;
 
 /**
- * Fitbit OAuth/REST 호출 어댑터.
- * - {@link #refreshAndPersist(FitbitEntity)} : refresh token으로 새 access/refresh
- * 쌍을 발급받아
- * fitbit 행에 즉시 반영하고 새 access token을 반환한다.
- * - {@link #callApiAsJson(String, String)} : 주어진 access token으로 GET 호출.
+ * Fitbit OAuth2 refresh 과정 및 REST 호출 직렬화 헬퍼.
+ *
+ * <p>
+ * {@link #refreshAndPersist(project.server.dao.entity.FitbitEntity)} 는 refresh token 교환 결과를 즉시 DB 에 반영하고
+ * 새 access token 문자열을 돌려주며, 토큰 만료 순간은 {@link Instant} 로 저장된다.
+ * {@link #callApiAsJson(String, String)} 은 Bearer access 로 GET 결과를 Jackson 트리로 받는 단순 래핑이다.
+ * </p>
  */
 @Slf4j
 @Service

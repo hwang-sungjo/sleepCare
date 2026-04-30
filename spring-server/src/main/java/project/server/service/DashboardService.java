@@ -15,6 +15,9 @@ import java.time.ZoneId;
 import java.util.DoubleSummaryStatistics;
 import java.util.Optional;
 
+/**
+ * 홈 대시보드에 노출되는 수면 효율·수면 시간·환경 안내 문자열 조합.
+ */
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
@@ -24,6 +27,9 @@ public class DashboardService {
     private final DailyHealthSummaryRepository summaryRepository;
     private final RealtimeMetricRepository realtimeMetricRepository;
 
+    /**
+     * {@link #findLatestSummary(long)} 결과로 표시 가능한 두 수치와, 최근 IoT 지표 요약 문자열을 돌려준다.
+     */
     public GetSleepDashboardResponse dashboard(long userId) {
         Optional<DailyHealthSummary> latest = findLatestSummary(userId);
         int efficiency = latest.map(DailyHealthSummary::getEfficiency).orElse(0);
@@ -37,7 +43,10 @@ public class DashboardService {
                 .build();
     }
 
-    /** 가장 최근 7일 안에서 가장 최신 daily summary 한 건을 가져온다. */
+    /**
+     * KST 기준 오늘부터 과거로 하루씩 줄여 가며 탐색해, 요약 행이 있는 첫 날 한 건만 반환한다.
+     * (당일 또는 어제 행이 없으면 더 이전 날이 선택될 수 있어 사용자의 "어제"와 다를 수 있다.)
+     */
     private Optional<DailyHealthSummary> findLatestSummary(long userId) {
         LocalDate today = LocalDate.now(KST);
         for (int i = 0; i <= 6; i++) {
@@ -49,6 +58,9 @@ public class DashboardService {
         return Optional.empty();
     }
 
+    /**
+     * 최근 실시간 센서 샘플(최대 12건)의 습도·조도 평균으로 짧은 권장 문구를 선택한다.
+     */
     private String environmentHint(long userId) {
         var page = realtimeMetricRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, 12));
         if (page.isEmpty()) {

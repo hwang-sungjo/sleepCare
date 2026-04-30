@@ -33,23 +33,32 @@ import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 /**
- * Fitbit Cloud → 로컬 DB 동기화 파이프라인.
+ * Fitbit Web API 결과를 로컬 MySQL 각 건강 테이블에 채워 넣는 동기 계층.
  *
  * <p>
- * 두 진입점: {@link #initialSyncForUser(Long)}, {@link #scheduledFullSync()}.
+ * <b>트리거</b>: 전 사용자 주기 실행 {@link #scheduledFullSync()},
+ * 회원별 비동기 {@link #initialSyncForUser(Long)}.
  * </p>
  *
  * <p>
- * 심박({@link HeartRate}) 은 두 갈래이다.
+ * 배치 일자축과 심박 증분은 KST 기준 {@link LocalDate} / 분 범위로 맞춘다.
  * </p>
+ *
+ * <p><b>심박({@link HeartRate})</b></p>
  * <ul>
- * <li><b>일 배치:</b> 7일 루프에서 아직 요약이 없는 날짜에 대해 일 단위 API 로 전체 분 데이터를 한 번 적재 (중복은
- * insert 생략).</li>
- * <li><b>증분:</b> 스케줄마다(기본 15분) KST 기준 직전 {@link #INCREMENTAL_HR_WINDOW_MINUTES}
- * 분 구간을
- * 시간 범위 API 로 가져와, 아직 없는 (user_id, record_date, record_time) 분만 insert.
- * {@code record_time} 은 해당 분의 {@link java.time.Instant} 이다.</li>
+ * <li><b>7일 플래시:</b> {@link #syncForUser} 에서 과거 포함 일자별 1분 전량을 한 번에 받아 넣으며,
+ *     이미 동일 사용자·날짜·분 순간 행이 있으면 insert 생략.</li>
+ * <li><b>증분:</b> 매 스케줄 시작 시 직전 {@link #INCREMENTAL_HR_WINDOW_MINUTES} 분만 시간 범위 API 로 당김.</li>
  * </ul>
+ *
+ * <p>
+ * 일일 요약({@link DailyHealthSummary}), 수면 단계, 호흡·체온 등은 같은 날짜 API 체인에서 처리하며,
+ * 본수면 레코드의 시작·종료 시각을 파싱할 수 없을 때 해당 일자 블록은 저장하지 않는다.
+ * </p>
+ *
+ * <p>
+ * 각 요청 간 {@link #sleep(long)} 호출은 Fitbit 쿼터 상의 연속 과호출 부담을 줄이려는 최소 간격이다.
+ * </p>
  */
 @Slf4j
 @Service
@@ -78,6 +87,7 @@ public class FitbitSyncService {
     private final HrvRepository hrvRepo;
     private final RealtimeMetricRepository realtimeMetricRepo;
 
+    /** 전체 사용자 토큰 갱신, 심박 증분, 7일치 싱크 순으로 돈다. 시작 시 TTL 기반 realtime_metric 삭제. */
     @Scheduled(fixedDelayString = "${app.fitbit.sync-interval-ms:900000}")
     public void scheduledFullSync() {
         purgeOldRealtimeMetric();
@@ -161,6 +171,12 @@ public class FitbitSyncService {
         persistHeartRateDatasetIfAbsent(userId, hrNode, date);
     }
 
+    /**
+     * KST 오늘부터 6일 전까지 순회하여 수면 요약→심박 일괄→SpO2→HRV 를 날마다 처리한다.
+     *
+     * @param skipExistingDays true 이면 {@code daily_health_summary} 에 이미 해당 날짜가 있으면
+     *                         그 날 모든 하위 호출까지 스킵(완료된 날짜 재비용 줄이기).
+     */
     private void syncForUser(FitbitEntity entity, String accessToken, boolean skipExistingDays) {
         Long userId = entity.getUserId();
         LocalDate today = LocalDate.now(KST);
@@ -197,7 +213,10 @@ public class FitbitSyncService {
         }
     }
 
-    /** 일일 요약 + 호흡수/체온 + 수면 단계 타임라인을 적재한다. 본 수면(main sleep) 구간 정보가 불충분하면 저장하지 않는다. */
+    /**
+     * 본수면(main sleep) JSON 이 파싱 가능할 때만 BR·피부온 REST 를 부르고
+     * {@link DailyHealthSummary}+{@link SleepStage} 를 한 번에 맞춘다.
+     */
     private void syncDailySummaryAndStages(Long userId, String accessToken, String dateStr,
             LocalDate targetDate, JsonNode sleepNode) {
         JsonNode mainSleep = extractMainSleep(sleepNode);
@@ -265,7 +284,7 @@ public class FitbitSyncService {
         summaryRepo.save(summary);
     }
 
-    /** Fitbit 목록 내 본수면 레코드를 찾거나 null. */
+    /** {@code sleep} 배열 원소 중에서 {@code isMainSleep}=true 분기 하나를 찾는다; 없으면 null. */
     private static JsonNode extractMainSleep(JsonNode sleepNode) {
         if (sleepNode == null || !sleepNode.has("sleep") || !sleepNode.get("sleep").isArray()) {
             return null;
@@ -277,7 +296,10 @@ public class FitbitSyncService {
         }
         return null;
     }
-
+    /**
+     * 본수면 식별 + 시작/종료 문자열 존재 + {@link project.server.util.FitbitInstantParser} 로
+     * 양쪽 모두 순간까지 변환 가능할 때만 true.
+     */
     private static boolean isPersistableMainSleep(JsonNode mainSleep) {
         if (mainSleep == null) {
             return false;

@@ -29,6 +29,7 @@ public class HeartRate {
 
     private Long userId;
     private LocalDate recordDate;
+    /** 해당 분 버킷을 식별하는 절대 순간(KST 달력 일자 + intraday time 으로부터 산출). */
     @Column(nullable = false)
     private Instant recordTime;
     private Integer bpm;

@@ -38,6 +38,11 @@ import project.server.dao.entity.RealtimeMetricEntity;
  * 끊겨도 연결이 자동 복구된다. JPA save 는 MQTT 콜백 스레드에서 호출되며,
  * 호출 자체가 새 트랜잭션을 시작한다.
  * </p>
+ *
+ * <p>
+ * 적재되는 {@code realtime_metric.user_id} 는 {@code app.mqtt.target-user-id}(기본 1) 로 고정되며,
+ * 동일 값이 {@code user} 에 없으면 외래키 제약 때문에 insert 가 실패한다.
+ * </p>
  */
 @Slf4j
 @Service
@@ -112,6 +117,7 @@ public class MqttSensorSubscriber {
     }
 
     private void handleMessage(byte[] payload) {
+        // 센서 JSON → realtime_metric 행으로 변환 저장 (targetUserId 는 구성값 고정).
         try {
             JsonNode node = objectMapper.readTree(payload);
             Double temperature = readDouble(node, "temperature");

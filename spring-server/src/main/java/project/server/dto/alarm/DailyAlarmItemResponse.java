@@ -19,7 +19,7 @@ public class DailyAlarmItemResponse {
     @Schema(description = "사용자가 설정한 기본 기상시간(HH:mm)", example = "07:30")
     private String baseWakeTime;
 
-    @Schema(description = "해당 요일에 계산된 동적 기상 시각(없으면 null)", nullable = true, example = "2026-04-29T22:15:00Z")
+    @Schema(description = "해당 요일에 계산되어 저장된 동적 기상 시각(Asia/Seoul와 base 조합 결과의 Instant ISO)", example = "2026-04-29T22:15:00Z")
     private Instant dynamicWakeAt;
 
     @Schema(description = "적응형 알람 활성화 여부", example = "true")

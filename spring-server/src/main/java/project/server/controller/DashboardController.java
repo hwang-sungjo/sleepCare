@@ -33,7 +33,10 @@ public class DashboardController {
 
     @Operation(
             summary = "수면 요약 조회",
-            description = "수면 효율, 평균 수면 시간(분), 환경 힌트 텍스트를 반환합니다.",
+            description =
+                    "최근 7일(KST 기준 오늘부터 역방향) 중 daily_health_summary 가 존재하는 가장 새로운 날의 수면 지표와, "
+                            + "최근 realtime_metric 에 기반한 환경 안내 문자열을 반환합니다. "
+                            + "반드시 '어제 수면'을 의미하지는 않습니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(

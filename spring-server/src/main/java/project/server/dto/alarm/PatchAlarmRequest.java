@@ -36,6 +36,9 @@ public class PatchAlarmRequest {
     private Integer windowMinutesBefore;
 
     @Nullable
-    @Schema(description = "true면 최신 데이터 기반으로 동적 알람 시각을 즉시 재계산", example = "false", nullable = true)
+    @Schema(
+            description = "오늘이 적용 대상일 때 true 로 두면 즉시 수면 단계를 반영한 동적 시각 재계산을 실행",
+            example = "false",
+            nullable = true)
     private Boolean recomputeDynamicNow;
 }
