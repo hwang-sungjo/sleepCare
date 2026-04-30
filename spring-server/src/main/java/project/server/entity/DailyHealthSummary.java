@@ -35,11 +35,11 @@ public class DailyHealthSummary {
     @Id
     private LocalDate recordDate;
 
-    @Column(nullable = false, length = 64)
-    private String startTime;
+    @Column(nullable = false)
+    private Instant startTime;
 
-    @Column(nullable = false, length = 64)
-    private String endTime;
+    @Column(nullable = false)
+    private Instant endTime;
 
     @Column(nullable = false)
     private int timeInBed;

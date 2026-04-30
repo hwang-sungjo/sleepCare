@@ -14,11 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
@@ -93,8 +90,7 @@ public class DynamicAlarmService {
      */
     private Instant calculateWindowEndInstant(AlarmEntity alarm, Instant reference) {
         LocalDate today = LocalDate.ofInstant(reference, DEFAULT_ZONE);
-        LocalDateTime goal = LocalDateTime.of(today, alarm.getBaseWakeTime());
-        return goal.atZone(DEFAULT_ZONE).toInstant();
+        return ZonedDateTime.of(today, alarm.getBaseWakeTime(), DEFAULT_ZONE).toInstant();
     }
 
     private static boolean hasRungAlready(AlarmEntity alarm, Instant now, Instant baseWakeInstant) {
@@ -113,7 +109,7 @@ public class DynamicAlarmService {
         if (!isShallow(stage)) {
             return null;
         }
-        Instant t = parseStartInstant(row);
+        Instant t = row.getStartTime();
         if (t == null) {
             return null;
         }
@@ -134,28 +130,5 @@ public class DynamicAlarmService {
             return false;
         }
         return SHALLOW_STAGE_KEYWORDS.stream().anyMatch(stageLower::contains);
-    }
-
-    /** SleepStage#getStartTime 은 ISO-8601 문자열이거나 누락될 수 있으므로 안전하게 파싱한다. */
-    private static Instant parseStartInstant(SleepStage row) {
-        String text = row.getStartTime();
-        if (text == null || text.isBlank()) {
-            return null;
-        }
-        try {
-            return OffsetDateTime.parse(text).toInstant();
-        } catch (DateTimeParseException ignored) {
-            // continue
-        }
-        try {
-            return ZonedDateTime.parse(text).toInstant();
-        } catch (DateTimeParseException ignored) {
-            // continue
-        }
-        try {
-            return LocalDateTime.parse(text).atZone(DEFAULT_ZONE).toInstant();
-        } catch (DateTimeParseException ignored) {
-            return null;
-        }
     }
 }

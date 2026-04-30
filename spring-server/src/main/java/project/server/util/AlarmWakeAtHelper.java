@@ -3,9 +3,9 @@ package project.server.util;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAdjusters;
 
 /**
@@ -25,13 +25,13 @@ public final class AlarmWakeAtHelper {
         int curr = today.getDayOfWeek().getValue();
         int delta = Math.floorMod(isoDayOfWeek1To7 - curr, 7);
         LocalDate wakeDate = today.plusDays(delta);
-        return LocalDateTime.of(wakeDate, baseWakeTime).atZone(zone).toInstant();
+        return ZonedDateTime.of(wakeDate, baseWakeTime, zone).toInstant();
     }
 
     /** 오늘(KST 등) 의 날짜 + base 시간. */
     public static Instant todayWakeInstant(LocalTime baseWakeTime, ZoneId zone) {
         LocalDate today = LocalDate.now(zone);
-        return LocalDateTime.of(today, baseWakeTime).atZone(zone).toInstant();
+        return ZonedDateTime.of(today, baseWakeTime, zone).toInstant();
     }
 
     /** 오늘 이후 해당 ISO 요일의 "다음" 발생(오늘이 그 요일이면 다음 주 동일 요일). */
@@ -39,6 +39,6 @@ public final class AlarmWakeAtHelper {
         LocalDate start = LocalDate.now(zone);
         LocalDate wakeDate =
                 start.with(TemporalAdjusters.next(DayOfWeek.of(isoDayOfWeek1To7)));
-        return LocalDateTime.of(wakeDate, baseWakeTime).atZone(zone).toInstant();
+        return ZonedDateTime.of(wakeDate, baseWakeTime, zone).toInstant();
     }
 }

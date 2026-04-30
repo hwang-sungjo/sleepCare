@@ -29,7 +29,8 @@ public class Hrv {
 
     private Long userId;
     private LocalDate recordDate;
-    private String recordTime;
+    @Column(nullable = false)
+    private Instant recordTime;
     private Double rmssdValue;
 
     @CreationTimestamp

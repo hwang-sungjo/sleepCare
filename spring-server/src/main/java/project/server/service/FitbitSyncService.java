@@ -21,6 +21,7 @@ import project.server.entity.HeartRate;
 import project.server.entity.Hrv;
 import project.server.entity.SleepStage;
 import project.server.entity.SpO2;
+import project.server.util.FitbitInstantParser;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -29,6 +30,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 
 /**
  * Fitbit Cloud → 로컬 DB 동기화 파이프라인.
@@ -45,7 +47,8 @@ import java.time.format.DateTimeFormatter;
  * insert 생략).</li>
  * <li><b>증분:</b> 스케줄마다(기본 15분) KST 기준 직전 {@link #INCREMENTAL_HR_WINDOW_MINUTES}
  * 분 구간을
- * 시간 범위 API 로 가져와, 아직 없는 (user_id, record_date, record_time) 만 insert.</li>
+ * 시간 범위 API 로 가져와, 아직 없는 (user_id, record_date, record_time) 분만 insert.
+ * {@code record_time} 은 해당 분의 {@link java.time.Instant} 이다.</li>
  * </ul>
  */
 @Slf4j
@@ -209,14 +212,22 @@ public class FitbitSyncService {
         JsonNode tempNode = authService.callApiAsJson(accessToken,
                 "https://api.fitbit.com/1/user/-/temp/skin/date/" + dateStr + ".json");
 
+        String startRaw = mainSleep.path("startTime").asText("").trim();
+        String endRaw = mainSleep.path("endTime").asText("").trim();
+        Optional<Instant> startInst = FitbitInstantParser.parseFlexibleInstant(startRaw);
+        Optional<Instant> endInst = FitbitInstantParser.parseFlexibleInstant(endRaw);
+        if (startInst.isEmpty() || endInst.isEmpty()) {
+            log.debug(
+                    "[FitbitSyncService] skip daily_health_summary sleep stages userId={} date={} (unparsable sleep bounds)",
+                    userId, targetDate);
+            return;
+        }
+
         DailyHealthSummary summary = new DailyHealthSummary();
         summary.setUserId(userId);
         summary.setRecordDate(targetDate);
-
-        String startRaw = mainSleep.path("startTime").asText("").trim();
-        String endRaw = mainSleep.path("endTime").asText("").trim();
-        summary.setStartTime(startRaw);
-        summary.setEndTime(endRaw);
+        summary.setStartTime(startInst.get());
+        summary.setEndTime(endInst.get());
 
         summary.setTimeInBed(mainSleep.path("timeInBed").asInt(0));
         summary.setMinutesAsleep(mainSleep.path("minutesAsleep").asInt(0));
@@ -237,10 +248,14 @@ public class FitbitSyncService {
         JsonNode timeline = mainSleep.path("levels").path("data");
         if (timeline.isArray()) {
             for (JsonNode t : timeline) {
+                Optional<Instant> segStart = FitbitInstantParser.parseFlexibleInstant(t.path("dateTime").asText(null));
+                if (segStart.isEmpty()) {
+                    continue;
+                }
                 SleepStage row = new SleepStage();
                 row.setUserId(userId);
                 row.setRecordDate(targetDate);
-                row.setStartTime(t.path("dateTime").asText(null));
+                row.setStartTime(segStart.get());
                 row.setDurationSeconds(t.path("seconds").asInt(0));
                 row.setStageLevel(t.path("level").asText(null));
                 stageRepo.save(row);
@@ -269,7 +284,11 @@ public class FitbitSyncService {
         }
         String start = mainSleep.path("startTime").asText(null);
         String end = mainSleep.path("endTime").asText(null);
-        return start != null && !start.isBlank() && end != null && !end.isBlank();
+        if (start == null || start.isBlank() || end == null || end.isBlank()) {
+            return false;
+        }
+        return FitbitInstantParser.parseFlexibleInstant(start.trim()).isPresent()
+                && FitbitInstantParser.parseFlexibleInstant(end.trim()).isPresent();
     }
 
     private static double extractBreathingRate(JsonNode brNode) {
@@ -308,17 +327,21 @@ public class FitbitSyncService {
             if (time == null) {
                 continue;
             }
+            Instant recordInstant = FitbitInstantParser.parseHeartRateMinuteToInstant(recordDate, time, KST);
+            if (recordInstant == null) {
+                continue;
+            }
             int bpm = data.path("value").asInt(0);
             if (bpm <= 0) {
                 continue;
             }
-            if (hrRepo.existsByUserIdAndRecordDateAndRecordTime(userId, recordDate, time)) {
+            if (hrRepo.existsByUserIdAndRecordDateAndRecordTime(userId, recordDate, recordInstant)) {
                 continue;
             }
             HeartRate row = new HeartRate();
             row.setUserId(userId);
             row.setRecordDate(recordDate);
-            row.setRecordTime(time);
+            row.setRecordTime(recordInstant);
             row.setBpm(bpm);
             hrRepo.save(row);
             inserted++;
@@ -337,10 +360,15 @@ public class FitbitSyncService {
             JsonNode minutes = spo2Node.get("minutes");
             if (minutes != null && minutes.isArray()) {
                 for (JsonNode data : minutes) {
+                    Optional<Instant> minuteInstant =
+                            FitbitInstantParser.parseFlexibleInstant(data.path("minute").asText(null));
+                    if (minuteInstant.isEmpty()) {
+                        continue;
+                    }
                     SpO2 row = new SpO2();
                     row.setUserId(userId);
                     row.setRecordDate(targetDate);
-                    row.setRecordTime(data.path("minute").asText(null));
+                    row.setRecordTime(minuteInstant.get());
                     row.setSpo2Value(data.path("value").asDouble(0));
                     spo2Repo.save(row);
                 }
@@ -357,10 +385,15 @@ public class FitbitSyncService {
             JsonNode minutes = hrvNode.get("hrv").get(0).get("minutes");
             if (minutes != null && minutes.isArray()) {
                 for (JsonNode data : minutes) {
+                    Optional<Instant> minuteInstant =
+                            FitbitInstantParser.parseFlexibleInstant(data.path("minute").asText(null));
+                    if (minuteInstant.isEmpty()) {
+                        continue;
+                    }
                     Hrv row = new Hrv();
                     row.setUserId(userId);
                     row.setRecordDate(targetDate);
-                    row.setRecordTime(data.path("minute").asText(null));
+                    row.setRecordTime(minuteInstant.get());
                     row.setRmssdValue(data.path("value").path("rmssd").asDouble(0));
                     hrvRepo.save(row);
                 }

@@ -32,7 +32,8 @@ public class SpO2 {
 
     private Long userId;
     private LocalDate recordDate;
-    private String recordTime;
+    @Column(nullable = false)
+    private Instant recordTime;
 
     @Column(name = "spo2_value")
     private Double spo2Value;

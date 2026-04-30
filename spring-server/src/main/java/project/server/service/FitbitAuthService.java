@@ -20,7 +20,7 @@ import org.springframework.web.client.RestTemplate;
 import project.server.dao.FitbitRepository;
 import project.server.dao.entity.FitbitEntity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Base64;
 
 /**
@@ -77,7 +77,7 @@ public class FitbitAuthService {
                     return null;
                 }
 
-                LocalDateTime expiresAt = LocalDateTime.now()
+                Instant expiresAt = Instant.now()
                         .plusSeconds(expiresIn > 0 ? expiresIn : DEFAULT_EXPIRES_IN_SECONDS);
                 entity.setFitbitAccessToken(newAccess);
                 entity.setFitbitRefreshToken(newRefresh);

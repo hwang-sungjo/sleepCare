@@ -12,7 +12,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -33,13 +33,13 @@ public class FitbitEntity {
     @Column(name = "fitbit_refresh_token", columnDefinition = "TEXT")
     private String fitbitRefreshToken;
 
-    private LocalDateTime fitbitTokenExpiresAt;
+    private Instant fitbitTokenExpiresAt;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 }
