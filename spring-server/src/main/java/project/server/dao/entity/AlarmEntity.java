@@ -34,6 +34,7 @@ public class AlarmEntity {
     /** ISO day-of-week value (1=Mon ... 7=Sun). One alarm per day per user. */
     private Integer dayOfWeek;
     private LocalTime baseWakeTime;
+    @Column(nullable = false)
     private Instant dynamicWakeAt;
     private Boolean adaptiveEnabled;
     private Integer windowMinutesBefore;

@@ -2,7 +2,7 @@
 -- SleepCare server schema
 -- 1) user                 : 서비스 가입자
 -- 2) fitbit               : Fitbit OAuth 토큰 보관 (사용자 1:1)
--- 3) realtime_metric      : 라즈베리파이 등 IoT가 1분 단위로 푸시하는 환경/심박 통합 지표
+-- 3) realtime_metric      : 라즈베리파이 등 IoT가 1분 단위로 푸시하는 환경 지표(조도/온습)
 -- 4) heart_rate           : 기상 시점에 한 번 수집되는 분 단위 Fitbit 심박
 -- 5) hrv                  : 기상 시점에 한 번 수집되는 분 단위 HRV(rmssd)
 -- 6) sleep_stage          : 기상 시점에 한 번 수집되는 수면 단계 타임라인
@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS `realtime_metric` (
     `illuminance`        DOUBLE,
     `temperature`        DOUBLE,
     `humidity`           DOUBLE,
-    `heart_rate_bpm`     INT,
     `created_at`         DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at`         DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT `fk_realtime_metric_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE
@@ -46,7 +45,7 @@ CREATE TABLE IF NOT EXISTS `heart_rate` (
     `id`          BIGINT      AUTO_INCREMENT PRIMARY KEY,
     `user_id`     BIGINT      NOT NULL,
     `record_date` DATE        NOT NULL,
-    `record_time` VARCHAR(32),
+    `record_time` DATETIME(6) NOT NULL,
     `bpm`         INT,
     `created_at`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
@@ -57,7 +56,7 @@ CREATE TABLE IF NOT EXISTS `hrv` (
     `id`          BIGINT      AUTO_INCREMENT PRIMARY KEY,
     `user_id`     BIGINT      NOT NULL,
     `record_date` DATE        NOT NULL,
-    `record_time` VARCHAR(32),
+    `record_time` DATETIME(6) NOT NULL,
     `rmssd_value` DOUBLE,
     `created_at`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
@@ -68,7 +67,7 @@ CREATE TABLE IF NOT EXISTS `sleep_stage` (
     `id`               BIGINT      AUTO_INCREMENT PRIMARY KEY,
     `user_id`          BIGINT      NOT NULL,
     `record_date`      DATE        NOT NULL,
-    `start_time`       VARCHAR(64),
+    `start_time`       DATETIME(6) NOT NULL,
     `duration_seconds` INT,
     `stage_level`      VARCHAR(32),
     `created_at`       DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -80,7 +79,7 @@ CREATE TABLE IF NOT EXISTS `spo2` (
     `id`          BIGINT      AUTO_INCREMENT PRIMARY KEY,
     `user_id`     BIGINT      NOT NULL,
     `record_date` DATE        NOT NULL,
-    `record_time` VARCHAR(32),
+    `record_time` DATETIME(6) NOT NULL,
     `spo2_value`  DOUBLE,
     `created_at`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at`  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
@@ -88,20 +87,20 @@ CREATE TABLE IF NOT EXISTS `spo2` (
 );
 
 CREATE TABLE IF NOT EXISTS `daily_health_summary` (
-    `user_id`            BIGINT      NOT NULL,
-    `record_date`        DATE        NOT NULL,
-    `start_time`         VARCHAR(64),
-    `end_time`           VARCHAR(64),
-    `time_in_bed`        INT,
-    `minutes_asleep`     INT,
-    `minutes_awake`      INT,
-    `efficiency`         INT,
-    `deep_mins`          INT,
-    `light_mins`         INT,
-    `rem_mins`           INT,
-    `wake_mins`          INT,
-    `breathing_rate`     DOUBLE,
-    `skin_temp_relative` DOUBLE,
+    `user_id`            BIGINT       NOT NULL,
+    `record_date`        DATE         NOT NULL,
+    `start_time`         DATETIME(6)  NOT NULL,
+    `end_time`           DATETIME(6)  NOT NULL,
+    `time_in_bed`        INT          NOT NULL DEFAULT 0,
+    `minutes_asleep`     INT          NOT NULL DEFAULT 0,
+    `minutes_awake`      INT          NOT NULL DEFAULT 0,
+    `efficiency`         INT          NOT NULL DEFAULT 0,
+    `deep_mins`          INT          NOT NULL DEFAULT 0,
+    `light_mins`         INT          NOT NULL DEFAULT 0,
+    `rem_mins`           INT          NOT NULL DEFAULT 0,
+    `wake_mins`          INT          NOT NULL DEFAULT 0,
+    `breathing_rate`     DOUBLE       NOT NULL DEFAULT 0,
+    `skin_temp_relative` DOUBLE       NOT NULL DEFAULT 0,
     `created_at`         DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     `updated_at`         DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     PRIMARY KEY (`user_id`, `record_date`),
@@ -113,7 +112,7 @@ CREATE TABLE IF NOT EXISTS `alarm` (
     `user_id`               BIGINT      NOT NULL,
     `day_of_week`           TINYINT     NOT NULL,
     `base_wake_time`        TIME        NOT NULL,
-    `dynamic_wake_at`       DATETIME(6),
+    `dynamic_wake_at`       DATETIME(6) NOT NULL,
     `adaptive_enabled`      BOOLEAN     NOT NULL DEFAULT TRUE,
     `window_minutes_before` INT         NOT NULL DEFAULT 30,
     `created_at`            DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),

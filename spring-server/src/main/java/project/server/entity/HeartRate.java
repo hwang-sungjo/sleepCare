@@ -29,7 +29,8 @@ public class HeartRate {
 
     private Long userId;
     private LocalDate recordDate;
-    private String recordTime;
+    @Column(nullable = false)
+    private Instant recordTime;
     private Integer bpm;
 
     @CreationTimestamp

@@ -41,8 +41,7 @@ public class DashboardService {
     private Optional<DailyHealthSummary> findLatestSummary(long userId) {
         LocalDate today = LocalDate.now(KST);
         for (int i = 0; i <= 6; i++) {
-            Optional<DailyHealthSummary> hit =
-                    summaryRepository.findByUserIdAndRecordDate(userId, today.minusDays(i));
+            Optional<DailyHealthSummary> hit = summaryRepository.findByUserIdAndRecordDate(userId, today.minusDays(i));
             if (hit.isPresent()) {
                 return hit;
             }
@@ -70,9 +69,9 @@ public class DashboardService {
         if (avgHum < 35d) {
             return "실내 공기가 다소 건조합니다. 가습을 조금 높여 보세요.";
         }
-        double avgLux =
-                page.stream().map(s -> s.getIlluminance()).filter(java.util.Objects::nonNull).mapToDouble(v -> v)
-                        .average().orElse(0d);
+        double avgLux = page.stream().map(s -> s.getIlluminance()).filter(java.util.Objects::nonNull)
+                .mapToDouble(v -> v)
+                .average().orElse(0d);
         if (avgLux > 200d) {
             return "취침 전 시간대 조도가 높았습니다. 암막 또는 차광 블라인드를 활용하면 멜라토닌 분비에 도움이 됩니다.";
         }

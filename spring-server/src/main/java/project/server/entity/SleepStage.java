@@ -29,7 +29,8 @@ public class SleepStage {
 
     private Long userId;
     private LocalDate recordDate;
-    private String startTime;
+    @Column(nullable = false)
+    private Instant startTime;
     private Integer durationSeconds;
     private String stageLevel;
 

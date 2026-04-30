@@ -6,6 +6,7 @@ import project.server.dao.AlarmRepository;
 import project.server.dao.SleepStageRepository;
 import project.server.dao.entity.AlarmEntity;
 import project.server.entity.SleepStage;
+import project.server.util.AlarmWakeAtHelper;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,11 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
@@ -48,19 +46,21 @@ public class DynamicAlarmService {
     public void recalculateForUser(Long userId) {
         int todayDay = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();
         AlarmEntity alarm = alarmRepository.findByUserIdAndDayOfWeek(userId, todayDay).orElse(null);
-        if (alarm == null || Boolean.FALSE.equals(alarm.getAdaptiveEnabled())) {
+        if (alarm == null) {
+            return;
+        }
+        if (Boolean.FALSE.equals(alarm.getAdaptiveEnabled())) {
+            alarm.setDynamicWakeAt(
+                    AlarmWakeAtHelper.todayWakeInstant(alarm.getBaseWakeTime(), DEFAULT_ZONE));
+            alarmRepository.save(alarm);
             return;
         }
         Instant now = Instant.now();
         Instant windowEnd = calculateWindowEndInstant(alarm, now);
-        if (windowEnd == null) {
-            alarm.setDynamicWakeAt(null);
-            alarmRepository.save(alarm);
-            return;
-        }
-        // 오늘 알람이 이미 울렸다면 다이나믹 값을 제거해 다음 주 동일 요일에서 다시 계산한다.
+        // 오늘 알람이 이미 울렸다면 다음 주 동일 요일 기준 시각으로 옮긴다.
         if (hasRungAlready(alarm, now, windowEnd)) {
-            alarm.setDynamicWakeAt(null);
+            alarm.setDynamicWakeAt(AlarmWakeAtHelper.nextWeeklyWakeInstant(
+                    alarm.getDayOfWeek(), alarm.getBaseWakeTime(), DEFAULT_ZONE));
             alarmRepository.save(alarm);
             return;
         }
@@ -90,8 +90,7 @@ public class DynamicAlarmService {
      */
     private Instant calculateWindowEndInstant(AlarmEntity alarm, Instant reference) {
         LocalDate today = LocalDate.ofInstant(reference, DEFAULT_ZONE);
-        LocalDateTime goal = LocalDateTime.of(today, alarm.getBaseWakeTime());
-        return goal.atZone(DEFAULT_ZONE).toInstant();
+        return ZonedDateTime.of(today, alarm.getBaseWakeTime(), DEFAULT_ZONE).toInstant();
     }
 
     private static boolean hasRungAlready(AlarmEntity alarm, Instant now, Instant baseWakeInstant) {
@@ -110,7 +109,7 @@ public class DynamicAlarmService {
         if (!isShallow(stage)) {
             return null;
         }
-        Instant t = parseStartInstant(row);
+        Instant t = row.getStartTime();
         if (t == null) {
             return null;
         }
@@ -131,28 +130,5 @@ public class DynamicAlarmService {
             return false;
         }
         return SHALLOW_STAGE_KEYWORDS.stream().anyMatch(stageLower::contains);
-    }
-
-    /** SleepStage#getStartTime 은 ISO-8601 문자열이거나 누락될 수 있으므로 안전하게 파싱한다. */
-    private static Instant parseStartInstant(SleepStage row) {
-        String text = row.getStartTime();
-        if (text == null || text.isBlank()) {
-            return null;
-        }
-        try {
-            return OffsetDateTime.parse(text).toInstant();
-        } catch (DateTimeParseException ignored) {
-            // continue
-        }
-        try {
-            return ZonedDateTime.parse(text).toInstant();
-        } catch (DateTimeParseException ignored) {
-            // continue
-        }
-        try {
-            return LocalDateTime.parse(text).atZone(DEFAULT_ZONE).toInstant();
-        } catch (DateTimeParseException ignored) {
-            return null;
-        }
     }
 }

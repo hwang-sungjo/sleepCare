@@ -16,35 +16,40 @@ import project.server.dao.RealtimeMetricRepository;
 import project.server.dao.SleepStageRepository;
 import project.server.dao.SpO2Repository;
 import project.server.dao.entity.FitbitEntity;
-import project.server.dao.entity.RealtimeMetricEntity;
 import project.server.entity.DailyHealthSummary;
 import project.server.entity.HeartRate;
 import project.server.entity.Hrv;
 import project.server.entity.SleepStage;
 import project.server.entity.SpO2;
+import project.server.util.FitbitInstantParser;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
+import java.util.Optional;
 
 /**
  * Fitbit Cloud → 로컬 DB 동기화 파이프라인.
  *
  * <p>
- * 두 개의 진입점이 있다.
+ * 두 진입점: {@link #initialSyncForUser(Long)}, {@link #scheduledFullSync()}.
+ * </p>
+ *
+ * <p>
+ * 심박({@link HeartRate}) 은 두 갈래이다.
  * </p>
  * <ul>
- * <li>{@link #initialSyncForUser(Long)} : 가입 직후 비동기로 1회 호출. 토큰을 refresh로
- * 검증·갱신한 뒤 7일치 데이터를 <b>존재 여부 확인 없이</b> 모두 적재한다.</li>
- * <li>{@link #scheduledFullSync()} : 주기 호출. 모든 fitbit 행을 돌며 토큰을 갱신하고
- * (user, date) 쌍이 이미 있는 날짜는 통째로 스킵하여 새로운 날짜만 채운다.</li>
+ * <li><b>일 배치:</b> 7일 루프에서 아직 요약이 없는 날짜에 대해 일 단위 API 로 전체 분 데이터를 한 번 적재 (중복은
+ * insert 생략).</li>
+ * <li><b>증분:</b> 스케줄마다(기본 15분) KST 기준 직전 {@link #INCREMENTAL_HR_WINDOW_MINUTES}
+ * 분 구간을
+ * 시간 범위 API 로 가져와, 아직 없는 (user_id, record_date, record_time) 분만 insert.
+ * {@code record_time} 은 해당 분의 {@link java.time.Instant} 이다.</li>
  * </ul>
- * 두 경로 모두 시작 시점에 {@link FitbitAuthService#refreshAndPersist(FitbitEntity)} 으로
- * fitbit 행의 access/refresh/expires_at 을 즉시 갱신한다.
  */
 @Slf4j
 @Service
@@ -53,14 +58,15 @@ public class FitbitSyncService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter TIME_HM = DateTimeFormatter.ofPattern("HH:mm");
 
     /**
-     * Fitbit 동기화 직후, realtime_metric 의 heart_rate_bpm 을 분 단위로 매칭해
-     * 갱신할 backfill 윈도우. 동기화 주기(15분) + 약간의 안전 여유.
+     * Fitbit 클라우드에 반영되는 심박 지연(~15분)을 고려한 증분 수집 윈도우(분).
+     * 직전 20분 데이터만 시간 범위로 조회.
      */
-    private static final Duration BACKFILL_WINDOW = Duration.ofMinutes(20);
+    private static final int INCREMENTAL_HR_WINDOW_MINUTES = 20;
 
-    /** realtime_metric 보존 기한. 동기화 주기마다 이보다 오래된 행은 일괄 삭제한다. */
+    /** realtime_metric 보존 기한 */
     private static final Duration REALTIME_METRIC_TTL = Duration.ofHours(24);
 
     private final FitbitAuthService authService;
@@ -80,6 +86,7 @@ public class FitbitSyncService {
             if (accessToken == null) {
                 continue;
             }
+            syncIncrementalHeartRateWindow(entity.getUserId(), accessToken);
             syncForUser(entity, accessToken, /* skipExistingDays = */ true);
         }
     }
@@ -117,9 +124,43 @@ public class FitbitSyncService {
     }
 
     /**
-     * 한 사용자에 대해 최근 7일 윈도우를 순회한다.
-     * skipExistingDays=true 면 daily_health_summary 가 이미 있는 날짜는 통째로 스킵한다.
+     * KST 기준 현재부터 직전 {@link #INCREMENTAL_HR_WINDOW_MINUTES} 분 구간의 심박을 Fitbit 시간 범위
+     * API 로 가져와
+     * 존재하지 않는 분만 DB 에 insert 한다. 자정을 건너는 경우 같은 스케줄에서 최대 두 번 나누어 호출한다.
      */
+    private void syncIncrementalHeartRateWindow(long userId, String accessToken) {
+        ZonedDateTime end = ZonedDateTime.now(KST).withSecond(0).withNano(0);
+        ZonedDateTime start = end.minusMinutes(INCREMENTAL_HR_WINDOW_MINUTES);
+
+        LocalDate startDay = start.toLocalDate();
+        LocalDate endDay = end.toLocalDate();
+        if (startDay.equals(endDay)) {
+            ingestHeartRateIntradayWindow(userId, accessToken, startDay, start.toLocalTime(), end.toLocalTime());
+        } else {
+            ingestHeartRateIntradayWindow(userId, accessToken, startDay, start.toLocalTime(), LocalTime.of(23, 59));
+            ingestHeartRateIntradayWindow(userId, accessToken, endDay, LocalTime.MIDNIGHT, end.toLocalTime());
+        }
+
+        log.debug("[FitbitSyncService] incremental HR synced userId={} window={}min (KST)",
+                userId, INCREMENTAL_HR_WINDOW_MINUTES);
+    }
+
+    /** 단일 로컬일 + [fromTime, toTime] (같은 날 안, end 포함) 시간 범위 API 호출 후 persist. */
+    private void ingestHeartRateIntradayWindow(long userId, String accessToken,
+            LocalDate date, LocalTime fromTime, LocalTime toTime) {
+        if (fromTime.isAfter(toTime)) {
+            return;
+        }
+        String d = date.format(DATE_FMT);
+        String url = String.format(
+                "https://api.fitbit.com/1/user/-/activities/heart/date/%s/%s/1min/time/%s/%s.json",
+                d, d,
+                TIME_HM.format(fromTime),
+                TIME_HM.format(toTime));
+        JsonNode hrNode = authService.callApiAsJson(accessToken, url);
+        persistHeartRateDatasetIfAbsent(userId, hrNode, date);
+    }
+
     private void syncForUser(FitbitEntity entity, String accessToken, boolean skipExistingDays) {
         Long userId = entity.getUserId();
         LocalDate today = LocalDate.now(KST);
@@ -138,7 +179,7 @@ public class FitbitSyncService {
 
             syncDailySummaryAndStages(userId, accessToken, dateStr, targetDate, sleepNode);
             sleep(500);
-            syncHeartRate(userId, accessToken, dateStr, targetDate);
+            syncHeartRateFullDay(userId, accessToken, dateStr, targetDate);
             sleep(500);
             syncSpO2(userId, accessToken, dateStr, targetDate);
             sleep(500);
@@ -146,51 +187,6 @@ public class FitbitSyncService {
             sleep(500);
         }
         log.info("[FitbitSyncService] sync done userId={}", userId);
-
-        // 동기화로 채워진 분 단위 HR 을 가지고, 최근 realtime_metric 행들을
-        // 분 단위로 다시 매칭해 heart_rate_bpm 을 갱신한다.
-        backfillRealtimeHeartRate(userId);
-    }
-
-    /**
-     * 한 사용자에 대해 최근 {@link #BACKFILL_WINDOW} 안의 realtime_metric 행을 모두 가져와,
-     * 각 행의 created_at(KST 기준 분 단위) 에 해당하는 heart_rate 행을 찾아
-     * heart_rate_bpm 을 다시 채운다.
-     *
-     * <ul>
-     * <li>매칭 키: (user_id, record_date, "HH:mm:00") — Fitbit intraday 1분 해상도</li>
-     * <li>매칭되는 HR 이 없으면 그 행은 그대로 둔다 (이전 "최근 1건" 값 유지).</li>
-     * <li>매칭은 됐지만 값이 동일하면 update 를 건너뛰어 불필요한 쓰기를 줄인다.</li>
-     * </ul>
-     */
-    private void backfillRealtimeHeartRate(Long userId) {
-        Instant since = Instant.now().minus(BACKFILL_WINDOW);
-        List<RealtimeMetricEntity> recent = realtimeMetricRepo.findByUserIdAndCreatedAtGreaterThanEqual(userId, since);
-        if (recent.isEmpty()) {
-            return;
-        }
-        int updated = 0;
-        for (RealtimeMetricEntity m : recent) {
-            ZonedDateTime kst = m.getCreatedAt().atZone(KST);
-            LocalDate recordDate = kst.toLocalDate();
-            String recordTime = String.format("%02d:%02d:00", kst.getHour(), kst.getMinute());
-
-            Integer matched = hrRepo
-                    .findByUserIdAndRecordDateAndRecordTime(userId, recordDate, recordTime)
-                    .map(HeartRate::getBpm)
-                    .orElse(null);
-            if (matched == null) {
-                continue;
-            }
-            if (matched.equals(m.getHeartRateBpm())) {
-                continue;
-            }
-            m.setHeartRateBpm(matched);
-            realtimeMetricRepo.save(m);
-            updated++;
-        }
-        log.info("[FitbitSyncService] realtime_metric backfill userId={} updated={}/{} window={}m",
-                userId, updated, recent.size(), BACKFILL_WINDOW.toMinutes());
     }
 
     private void sleep(long ms) {
@@ -201,82 +197,158 @@ public class FitbitSyncService {
         }
     }
 
-    /** 일일 요약 + 호흡수/체온 + 수면 단계 타임라인을 적재한다. */
+    /** 일일 요약 + 호흡수/체온 + 수면 단계 타임라인을 적재한다. 본 수면(main sleep) 구간 정보가 불충분하면 저장하지 않는다. */
     private void syncDailySummaryAndStages(Long userId, String accessToken, String dateStr,
             LocalDate targetDate, JsonNode sleepNode) {
+        JsonNode mainSleep = extractMainSleep(sleepNode);
+        if (!isPersistableMainSleep(mainSleep)) {
+            log.debug(
+                    "[FitbitSyncService] skip daily_health_summary sleep stages userId={} date={} (no complete main sleep)",
+                    userId, targetDate);
+            return;
+        }
         JsonNode brNode = authService.callApiAsJson(accessToken,
                 "https://api.fitbit.com/1/user/-/br/date/" + dateStr + ".json");
         JsonNode tempNode = authService.callApiAsJson(accessToken,
                 "https://api.fitbit.com/1/user/-/temp/skin/date/" + dateStr + ".json");
 
+        String startRaw = mainSleep.path("startTime").asText("").trim();
+        String endRaw = mainSleep.path("endTime").asText("").trim();
+        Optional<Instant> startInst = FitbitInstantParser.parseFlexibleInstant(startRaw);
+        Optional<Instant> endInst = FitbitInstantParser.parseFlexibleInstant(endRaw);
+        if (startInst.isEmpty() || endInst.isEmpty()) {
+            log.debug(
+                    "[FitbitSyncService] skip daily_health_summary sleep stages userId={} date={} (unparsable sleep bounds)",
+                    userId, targetDate);
+            return;
+        }
+
         DailyHealthSummary summary = new DailyHealthSummary();
         summary.setUserId(userId);
         summary.setRecordDate(targetDate);
+        summary.setStartTime(startInst.get());
+        summary.setEndTime(endInst.get());
 
-        if (sleepNode != null && sleepNode.has("sleep") && sleepNode.get("sleep").isArray()) {
-            for (JsonNode s : sleepNode.get("sleep")) {
-                if (s.path("isMainSleep").asBoolean(false)) {
-                    summary.setStartTime(s.path("startTime").asText(null));
-                    summary.setEndTime(s.path("endTime").asText(null));
-                    summary.setTimeInBed(s.path("timeInBed").asInt(0));
-                    summary.setMinutesAsleep(s.path("minutesAsleep").asInt(0));
-                    summary.setMinutesAwake(s.path("minutesAwake").asInt(0));
-                    summary.setEfficiency(s.path("efficiency").asInt(0));
+        summary.setTimeInBed(mainSleep.path("timeInBed").asInt(0));
+        summary.setMinutesAsleep(mainSleep.path("minutesAsleep").asInt(0));
+        summary.setMinutesAwake(mainSleep.path("minutesAwake").asInt(0));
+        summary.setEfficiency(mainSleep.path("efficiency").asInt(0));
 
-                    JsonNode stages = s.path("levels").path("summary");
-                    if (!stages.isMissingNode()) {
-                        summary.setDeepMins(stages.path("deep").path("minutes").asInt(0));
-                        summary.setLightMins(stages.path("light").path("minutes").asInt(0));
-                        summary.setRemMins(stages.path("rem").path("minutes").asInt(0));
-                        summary.setWakeMins(stages.path("wake").path("minutes").asInt(0));
-                    }
+        JsonNode stageSummary = mainSleep.path("levels").path("summary");
+        if (!stageSummary.isMissingNode()) {
+            summary.setDeepMins(stageSummary.path("deep").path("minutes").asInt(0));
+            summary.setLightMins(stageSummary.path("light").path("minutes").asInt(0));
+            summary.setRemMins(stageSummary.path("rem").path("minutes").asInt(0));
+            summary.setWakeMins(stageSummary.path("wake").path("minutes").asInt(0));
+        }
 
-                    JsonNode timeline = s.path("levels").path("data");
-                    if (timeline.isArray()) {
-                        for (JsonNode t : timeline) {
-                            SleepStage row = new SleepStage();
-                            row.setUserId(userId);
-                            row.setRecordDate(targetDate);
-                            row.setStartTime(t.path("dateTime").asText(null));
-                            row.setDurationSeconds(t.path("seconds").asInt(0));
-                            row.setStageLevel(t.path("level").asText(null));
-                            stageRepo.save(row);
-                        }
-                    }
-                    break;
+        summary.setBreathingRate(extractBreathingRate(brNode));
+        summary.setSkinTempRelative(extractSkinTempRelative(tempNode));
+
+        JsonNode timeline = mainSleep.path("levels").path("data");
+        if (timeline.isArray()) {
+            for (JsonNode t : timeline) {
+                Optional<Instant> segStart = FitbitInstantParser.parseFlexibleInstant(t.path("dateTime").asText(null));
+                if (segStart.isEmpty()) {
+                    continue;
                 }
+                SleepStage row = new SleepStage();
+                row.setUserId(userId);
+                row.setRecordDate(targetDate);
+                row.setStartTime(segStart.get());
+                row.setDurationSeconds(t.path("seconds").asInt(0));
+                row.setStageLevel(t.path("level").asText(null));
+                stageRepo.save(row);
             }
-        }
-
-        if (brNode != null && brNode.has("br") && brNode.get("br").isArray() && brNode.get("br").size() > 0) {
-            summary.setBreathingRate(brNode.get("br").get(0).path("value").path("breathingRate").asDouble(0));
-        }
-
-        if (tempNode != null && tempNode.has("tempSkin") && tempNode.get("tempSkin").isArray()
-                && tempNode.get("tempSkin").size() > 0) {
-            summary.setSkinTempRelative(
-                    tempNode.get("tempSkin").get(0).path("value").path("nightlyRelative").asDouble(0));
         }
 
         summaryRepo.save(summary);
     }
 
-    /** 분 단위 심박을 적재한다. */
-    private void syncHeartRate(Long userId, String accessToken, String dateStr, LocalDate targetDate) {
+    /** Fitbit 목록 내 본수면 레코드를 찾거나 null. */
+    private static JsonNode extractMainSleep(JsonNode sleepNode) {
+        if (sleepNode == null || !sleepNode.has("sleep") || !sleepNode.get("sleep").isArray()) {
+            return null;
+        }
+        for (JsonNode s : sleepNode.get("sleep")) {
+            if (s.path("isMainSleep").asBoolean(false)) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isPersistableMainSleep(JsonNode mainSleep) {
+        if (mainSleep == null) {
+            return false;
+        }
+        String start = mainSleep.path("startTime").asText(null);
+        String end = mainSleep.path("endTime").asText(null);
+        if (start == null || start.isBlank() || end == null || end.isBlank()) {
+            return false;
+        }
+        return FitbitInstantParser.parseFlexibleInstant(start.trim()).isPresent()
+                && FitbitInstantParser.parseFlexibleInstant(end.trim()).isPresent();
+    }
+
+    private static double extractBreathingRate(JsonNode brNode) {
+        if (brNode != null && brNode.has("br") && brNode.get("br").isArray() && brNode.get("br").size() > 0) {
+            return brNode.get("br").get(0).path("value").path("breathingRate").asDouble(0);
+        }
+        return 0d;
+    }
+
+    private static double extractSkinTempRelative(JsonNode tempNode) {
+        if (tempNode != null && tempNode.has("tempSkin") && tempNode.get("tempSkin").isArray()
+                && tempNode.get("tempSkin").size() > 0) {
+            return tempNode.get("tempSkin").get(0).path("value").path("nightlyRelative").asDouble(0);
+        }
+        return 0d;
+    }
+
+    /** 일별 전체 1분 intraday 한 번에 받아 존재하지 않는 행만 insert. */
+    private void syncHeartRateFullDay(Long userId, String accessToken, String dateStr, LocalDate targetDate) {
         JsonNode hrNode = authService.callApiAsJson(accessToken,
                 "https://api.fitbit.com/1/user/-/activities/heart/date/" + dateStr + "/1d/1min.json");
-        if (hrNode != null && hrNode.has("activities-heart-intraday")) {
-            JsonNode dataset = hrNode.get("activities-heart-intraday").get("dataset");
-            if (dataset != null && dataset.isArray()) {
-                for (JsonNode data : dataset) {
-                    HeartRate row = new HeartRate();
-                    row.setUserId(userId);
-                    row.setRecordDate(targetDate);
-                    row.setRecordTime(data.path("time").asText(null));
-                    row.setBpm(data.path("value").asInt(0));
-                    hrRepo.save(row);
-                }
+        persistHeartRateDatasetIfAbsent(userId, hrNode, targetDate);
+    }
+
+    private void persistHeartRateDatasetIfAbsent(Long userId, JsonNode hrNode, LocalDate recordDate) {
+        if (hrNode == null || !hrNode.has("activities-heart-intraday")) {
+            return;
+        }
+        JsonNode dataset = hrNode.get("activities-heart-intraday").path("dataset");
+        if (!dataset.isArray()) {
+            return;
+        }
+        int inserted = 0;
+        for (JsonNode data : dataset) {
+            String time = data.path("time").asText(null);
+            if (time == null) {
+                continue;
             }
+            Instant recordInstant = FitbitInstantParser.parseHeartRateMinuteToInstant(recordDate, time, KST);
+            if (recordInstant == null) {
+                continue;
+            }
+            int bpm = data.path("value").asInt(0);
+            if (bpm <= 0) {
+                continue;
+            }
+            if (hrRepo.existsByUserIdAndRecordDateAndRecordTime(userId, recordDate, recordInstant)) {
+                continue;
+            }
+            HeartRate row = new HeartRate();
+            row.setUserId(userId);
+            row.setRecordDate(recordDate);
+            row.setRecordTime(recordInstant);
+            row.setBpm(bpm);
+            hrRepo.save(row);
+            inserted++;
+        }
+        if (inserted > 0) {
+            log.debug("[FitbitSyncService] heart_rate inserts userId={} date={} rows={}",
+                    userId, recordDate, inserted);
         }
     }
 
@@ -288,10 +360,15 @@ public class FitbitSyncService {
             JsonNode minutes = spo2Node.get("minutes");
             if (minutes != null && minutes.isArray()) {
                 for (JsonNode data : minutes) {
+                    Optional<Instant> minuteInstant =
+                            FitbitInstantParser.parseFlexibleInstant(data.path("minute").asText(null));
+                    if (minuteInstant.isEmpty()) {
+                        continue;
+                    }
                     SpO2 row = new SpO2();
                     row.setUserId(userId);
                     row.setRecordDate(targetDate);
-                    row.setRecordTime(data.path("minute").asText(null));
+                    row.setRecordTime(minuteInstant.get());
                     row.setSpo2Value(data.path("value").asDouble(0));
                     spo2Repo.save(row);
                 }
@@ -308,10 +385,15 @@ public class FitbitSyncService {
             JsonNode minutes = hrvNode.get("hrv").get(0).get("minutes");
             if (minutes != null && minutes.isArray()) {
                 for (JsonNode data : minutes) {
+                    Optional<Instant> minuteInstant =
+                            FitbitInstantParser.parseFlexibleInstant(data.path("minute").asText(null));
+                    if (minuteInstant.isEmpty()) {
+                        continue;
+                    }
                     Hrv row = new Hrv();
                     row.setUserId(userId);
                     row.setRecordDate(targetDate);
-                    row.setRecordTime(data.path("minute").asText(null));
+                    row.setRecordTime(minuteInstant.get());
                     row.setRmssdValue(data.path("value").path("rmssd").asDouble(0));
                     hrvRepo.save(row);
                 }

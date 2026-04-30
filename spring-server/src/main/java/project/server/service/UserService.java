@@ -10,6 +10,7 @@ import project.server.dao.entity.AlarmEntity;
 import project.server.dao.entity.FitbitEntity;
 import project.server.dao.entity.UserEntity;
 import project.server.dto.user.*;
+import project.server.util.AlarmWakeAtHelper;
 
 import project.server.util.jwt.JwtTokenProvider;
 
@@ -22,6 +23,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import static project.server.common.response.status.BaseExceptionResponseStatus.*;
 
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.stream.IntStream;
 
 /**
@@ -42,6 +44,8 @@ public class UserService {
     private static final long DEMO_USER_ID = 1L;
     private static final String DEMO_USER_FITBIT_ACCESS_TOKEN = "";
     private static final String DEMO_USER_FITBIT_REFRESH_TOKEN = "";
+
+    private static final ZoneId ALARM_ZONE = ZoneId.of("Asia/Seoul");
 
     private final UserRepository userRepository;
     private final AlarmRepository alarmRepository;
@@ -66,15 +70,18 @@ public class UserService {
 
         fitbitRepository.save(buildFitbitRow(saved.getUserId()));
 
-        IntStream.rangeClosed(1, 7).forEach(day -> alarmRepository.save(
+        IntStream.rangeClosed(1, 7).forEach(day -> {
+            LocalTime base = LocalTime.of(7, 30);
+            alarmRepository.save(
                 AlarmEntity.builder()
                         .userId(saved.getUserId())
                         .dayOfWeek(day)
-                        .baseWakeTime(LocalTime.of(7, 30))
-                        .dynamicWakeAt(null)
+                        .baseWakeTime(base)
+                        .dynamicWakeAt(AlarmWakeAtHelper.nearestOccurrenceWakeInstant(day, base, ALARM_ZONE))
                         .adaptiveEnabled(true)
                         .windowMinutesBefore(30)
-                        .build()));
+                        .build());
+        });
 
         // 가입 트랜잭션이 커밋된 직후, 비동기로 Fitbit 초기 적재를 트리거한다.
         // 별도 스레드에서 fitbit 행을 다시 읽어 refresh → 7일치 insert(존재 여부 무시) 를 수행한다.
