@@ -39,6 +39,7 @@ public class AlarmService {
 
     private final AlarmRepository alarmRepository;
     private final DynamicAlarmService dynamicAlarmService;
+    private final MqttAlarmPublisher mqttAlarmPublisher;
 
     /**
      * 미보유 요일 알람 행을 채운 뒤 동적 알람을 재계산하고, 전체 목록과 오늘의 유효 기상 시각을 반환한다.
@@ -82,6 +83,12 @@ public class AlarmService {
                     alarm.getDayOfWeek(), alarm.getBaseWakeTime(), DEFAULT_ZONE));
         }
         alarmRepository.save(alarm);
+
+        boolean willRecalculateToday =
+                Boolean.TRUE.equals(request.getRecomputeDynamicNow()) && alarm.getDayOfWeek() == todayDow;
+        if (!willRecalculateToday && alarm.getDayOfWeek() == todayDow) {
+            mqttAlarmPublisher.publishWakeSchedule(userId, alarm.getDynamicWakeAt());
+        }
 
         if (Boolean.TRUE.equals(request.getRecomputeDynamicNow()) && alarm.getDayOfWeek() == todayDow) {
             dynamicAlarmService.recalculateForUser(userId);

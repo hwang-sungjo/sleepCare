@@ -136,5 +136,7 @@ app:
     alarm:
       client-id: ${MQTT_ALARM_CLIENT_ID:sleepcare-alarm}
       topic: ${MQTT_ALARM_TOPIC:iot/alarm/control}
-      toggle-interval-ms: ${MQTT_ALARM_TOGGLE_MS:2000}
+      # 라즈베리가 구독해 다음 기상 순간(JSON wakeAt, UTC ISO)으로 울림 시각 동기화
+      schedule-topic: ${MQTT_ALARM_SCHEDULE_TOPIC:iot/alarm/schedule}
+      publish-schedule-to-raspberry: ${MQTT_PUBLISH_SCHEDULE_TO_RASPBERRY:true}
 
