@@ -19,7 +19,6 @@ spring-server/.gradle/
 spring-server/build/
 spring-server/bin/
 
-
 # Keep Gradle Wrapper jar
 !**/gradle/wrapper/gradle-wrapper.jar
 
@@ -31,3 +30,4 @@ dist/
 # System Files
 .DS_Store
 Thumbs.db
+*.pyc
