@@ -24,7 +24,7 @@ import project.server.entity.SpO2;
 import project.server.util.FitbitInstantParser;
 
 import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -107,7 +107,7 @@ public class FitbitSyncService {
      * 동기화 주기마다 cycle 당 한 번씩만 실행하므로 사용자 수와 무관하게 단일 bulk DELETE 한 번만 발생한다.
      */
     private void purgeOldRealtimeMetric() {
-        Instant cutoff = Instant.now().minus(REALTIME_METRIC_TTL);
+        LocalDateTime cutoff = LocalDateTime.now(KST).minus(REALTIME_METRIC_TTL);
         int deleted = realtimeMetricRepo.deleteOlderThan(cutoff);
         if (deleted > 0) {
             log.info("[FitbitSyncService] purged {} realtime_metric rows older than {} (TTL={}h)",
@@ -234,8 +234,8 @@ public class FitbitSyncService {
 
         String startRaw = mainSleep.path("startTime").asText("").trim();
         String endRaw = mainSleep.path("endTime").asText("").trim();
-        Optional<Instant> startInst = FitbitInstantParser.parseFlexibleInstant(startRaw);
-        Optional<Instant> endInst = FitbitInstantParser.parseFlexibleInstant(endRaw);
+        Optional<LocalDateTime> startInst = FitbitInstantParser.parseFlexibleLocalDateTime(startRaw);
+        Optional<LocalDateTime> endInst = FitbitInstantParser.parseFlexibleLocalDateTime(endRaw);
         if (startInst.isEmpty() || endInst.isEmpty()) {
             log.debug(
                     "[FitbitSyncService] skip daily_health_summary sleep stages userId={} date={} (unparsable sleep bounds)",
@@ -268,7 +268,7 @@ public class FitbitSyncService {
         JsonNode timeline = mainSleep.path("levels").path("data");
         if (timeline.isArray()) {
             for (JsonNode t : timeline) {
-                Optional<Instant> segStart = FitbitInstantParser.parseFlexibleInstant(t.path("dateTime").asText(null));
+                Optional<LocalDateTime> segStart = FitbitInstantParser.parseFlexibleLocalDateTime(t.path("dateTime").asText(null));
                 if (segStart.isEmpty()) {
                     continue;
                 }
@@ -310,8 +310,8 @@ public class FitbitSyncService {
         if (start == null || start.isBlank() || end == null || end.isBlank()) {
             return false;
         }
-        return FitbitInstantParser.parseFlexibleInstant(start.trim()).isPresent()
-                && FitbitInstantParser.parseFlexibleInstant(end.trim()).isPresent();
+        return FitbitInstantParser.parseFlexibleLocalDateTime(start.trim()).isPresent()
+                && FitbitInstantParser.parseFlexibleLocalDateTime(end.trim()).isPresent();
     }
 
     private static double extractBreathingRate(JsonNode brNode) {
@@ -350,21 +350,21 @@ public class FitbitSyncService {
             if (time == null) {
                 continue;
             }
-            Instant recordInstant = FitbitInstantParser.parseHeartRateMinuteToInstant(recordDate, time, KST);
-            if (recordInstant == null) {
+            LocalDateTime recordTime = FitbitInstantParser.parseHeartRateMinuteToLocalDateTime(recordDate, time, KST);
+            if (recordTime == null) {
                 continue;
             }
             int bpm = data.path("value").asInt(0);
             if (bpm <= 0) {
                 continue;
             }
-            if (hrRepo.existsByUserIdAndRecordDateAndRecordTime(userId, recordDate, recordInstant)) {
+            if (hrRepo.existsByUserIdAndRecordDateAndRecordTime(userId, recordDate, recordTime)) {
                 continue;
             }
             HeartRate row = new HeartRate();
             row.setUserId(userId);
             row.setRecordDate(recordDate);
-            row.setRecordTime(recordInstant);
+            row.setRecordTime(recordTime);
             row.setBpm(bpm);
             hrRepo.save(row);
             inserted++;
@@ -383,8 +383,8 @@ public class FitbitSyncService {
             JsonNode minutes = spo2Node.get("minutes");
             if (minutes != null && minutes.isArray()) {
                 for (JsonNode data : minutes) {
-                    Optional<Instant> minuteInstant =
-                            FitbitInstantParser.parseFlexibleInstant(data.path("minute").asText(null));
+                    Optional<LocalDateTime> minuteInstant =
+                            FitbitInstantParser.parseFlexibleLocalDateTime(data.path("minute").asText(null));
                     if (minuteInstant.isEmpty()) {
                         continue;
                     }
@@ -408,8 +408,8 @@ public class FitbitSyncService {
             JsonNode minutes = hrvNode.get("hrv").get(0).get("minutes");
             if (minutes != null && minutes.isArray()) {
                 for (JsonNode data : minutes) {
-                    Optional<Instant> minuteInstant =
-                            FitbitInstantParser.parseFlexibleInstant(data.path("minute").asText(null));
+                    Optional<LocalDateTime> minuteInstant =
+                            FitbitInstantParser.parseFlexibleLocalDateTime(data.path("minute").asText(null));
                     if (minuteInstant.isEmpty()) {
                         continue;
                     }

@@ -3,7 +3,7 @@
 MQTT 로 (1) 일정(JSON wakeAt) 과 (2) 즉시 ON/OFF(문자열) 알람을 처리한다.
 
 - schedule 토픽: 서버가 보내는 다음 기상 시각
-    {"type":"wake_schedule","userId":1,"wakeAt":"2026-04-30T22:35:12.345Z"}
+    {"type":"wake_schedule","userId":1,"wakeAt":"2026-04-30T07:30:00+09:00"}
 - control 토픽: 기존과 동일 ON / OFF (서버 MqttAlarmPublisher 제어용)
 
 설치 (라즈베리파이):

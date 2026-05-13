@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import project.server.dao.entity.RealtimeMetricEntity;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 import java.util.List;
 
@@ -24,5 +24,5 @@ public interface RealtimeMetricRepository extends JpaRepository<RealtimeMetricEn
     @Modifying
     @Transactional
     @Query("DELETE FROM RealtimeMetricEntity r WHERE r.createdAt < :cutoff")
-    int deleteOlderThan(@Param("cutoff") Instant cutoff);
+    int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff);
 }

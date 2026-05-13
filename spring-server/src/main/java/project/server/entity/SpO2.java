@@ -12,7 +12,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 
 /**
@@ -33,16 +33,16 @@ public class SpO2 {
     private Long userId;
     private LocalDate recordDate;
     @Column(nullable = false)
-    private Instant recordTime;
+    private LocalDateTime recordTime;
 
     @Column(name = "spo2_value")
     private Double spo2Value;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 }

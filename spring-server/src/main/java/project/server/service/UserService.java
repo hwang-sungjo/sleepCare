@@ -79,7 +79,7 @@ public class UserService {
                         .userId(saved.getUserId())
                         .dayOfWeek(day)
                         .baseWakeTime(base)
-                        .dynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeInstant(day, base, ALARM_ZONE))
+                        .dynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeAt(day, base, ALARM_ZONE))
                         .adaptiveEnabled(true)
                         .windowMinutesBefore(30)
                         .build());

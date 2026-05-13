@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
@@ -18,10 +18,10 @@ public class GetAlarmResponse {
     private Integer todayDayOfWeek;
 
     @Schema(
-            description = "오늘 요일 알람 행이 있으면 그 행의 dynamic_wake_at 순간.",
-            example = "2026-04-29T22:15:00Z",
+            description = "오늘 요일 알람 행이 있으면 그 행의 dynamic_wake_at (한국 벽시계 LocalDateTime).",
+            example = "2026-04-30T07:30:00",
             nullable = true)
-    private Instant todayEffectiveWakeAt;
+    private LocalDateTime todayEffectiveWakeAt;
 
     @Schema(description = "요일별 알람 목록 (요일당 최대 1개)")
     private List<DailyAlarmItemResponse> alarms;

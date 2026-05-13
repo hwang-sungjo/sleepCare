@@ -14,7 +14,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 /** 사용자별·요일별 1건씩 존재하는 적응형 알람 설정. */
@@ -42,20 +42,20 @@ public class AlarmEntity {
     private LocalTime baseWakeTime;
 
     /**
-     * 그 요일 행 기준 현재 채택된 실제 알람 발생 후보 시각({@link Instant}; 계산·저장은 한국 시간대 기준 벽시계와 조합).
+     * 그 요일 행 기준 현재 채택된 실제 알람 발생 후보 시각(한국 벽시계 {@link LocalDateTime}).
      */
     @Column(nullable = false)
-    private Instant dynamicWakeAt;
+    private LocalDateTime dynamicWakeAt;
 
     private Boolean adaptiveEnabled;
     private Integer windowMinutesBefore;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 
 }

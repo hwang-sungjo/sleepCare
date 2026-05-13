@@ -12,7 +12,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.io.Serializable;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.Objects;
 
@@ -37,11 +37,11 @@ public class DailyHealthSummary {
 
     /** 본수면(main sleep) 시작 인스턴트 — Fitbit 응답 문자열에서 변환하여 저장한다. */
     @Column(nullable = false)
-    private Instant startTime;
+    private LocalDateTime startTime;
 
     /** 본수면(main sleep) 종료 인스턴트 — 시작과 동일한 방식으로 파싱된다. */
     @Column(nullable = false)
-    private Instant endTime;
+    private LocalDateTime endTime;
 
     @Column(nullable = false)
     private int timeInBed;
@@ -75,11 +75,11 @@ public class DailyHealthSummary {
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 
     /** Composite primary key for {@link DailyHealthSummary}. */
     @Getter

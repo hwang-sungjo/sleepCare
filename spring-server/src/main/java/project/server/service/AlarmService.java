@@ -12,8 +12,8 @@ import project.server.util.AlarmWakeAtHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -49,7 +49,7 @@ public class AlarmService {
         dynamicAlarmService.recalculateForUser(userId);
         List<AlarmEntity> alarms = alarmRepository.findAllByUserIdOrderByDayOfWeekAsc(userId);
         int todayDay = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();
-        Instant effective = resolveTodayEffectiveWakeAt(alarms, todayDay);
+        LocalDateTime effective = resolveTodayEffectiveWakeAt(alarms, todayDay);
         return toResponse(alarms, todayDay, effective);
     }
 
@@ -76,11 +76,11 @@ public class AlarmService {
         int todayDow = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();
         if (alarm.getDayOfWeek() == todayDow) {
             if (!Boolean.TRUE.equals(request.getRecomputeDynamicNow())) {
-                alarm.setDynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeInstant(
+                alarm.setDynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeAt(
                         alarm.getDayOfWeek(), alarm.getBaseWakeTime(), DEFAULT_ZONE));
             }
         } else {
-            alarm.setDynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeInstant(
+            alarm.setDynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeAt(
                     alarm.getDayOfWeek(), alarm.getBaseWakeTime(), DEFAULT_ZONE));
         }
         alarmRepository.save(alarm);
@@ -96,7 +96,7 @@ public class AlarmService {
         }
         List<AlarmEntity> alarms = alarmRepository.findAllByUserIdOrderByDayOfWeekAsc(userId);
         int todayDay = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();
-        Instant effective = resolveTodayEffectiveWakeAt(alarms, todayDay);
+        LocalDateTime effective = resolveTodayEffectiveWakeAt(alarms, todayDay);
         return toResponse(alarms, todayDay, effective);
     }
 
@@ -123,7 +123,7 @@ public class AlarmService {
                 .userId(userId)
                 .dayOfWeek(dayOfWeek)
                 .baseWakeTime(base)
-                .dynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeInstant(dayOfWeek, base, DEFAULT_ZONE))
+                .dynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeAt(dayOfWeek, base, DEFAULT_ZONE))
                 .adaptiveEnabled(true)
                 .windowMinutesBefore(30)
                 .build();
@@ -133,7 +133,7 @@ public class AlarmService {
      * 오늘 요일에 해당하는 알람 행의 {@link AlarmEntity#getDynamicWakeAt()} 을 반환한다.
      * 행이 없으면 null.
      */
-    private static Instant resolveTodayEffectiveWakeAt(List<AlarmEntity> alarms, int todayDay) {
+    private static LocalDateTime resolveTodayEffectiveWakeAt(List<AlarmEntity> alarms, int todayDay) {
         return alarms.stream()
                 .filter(a -> a.getDayOfWeek() == todayDay)
                 .findFirst()
@@ -141,7 +141,7 @@ public class AlarmService {
                 .orElse(null);
     }
 
-    private static GetAlarmResponse toResponse(List<AlarmEntity> alarms, int todayDay, Instant todayEffectiveWakeAt) {
+    private static GetAlarmResponse toResponse(List<AlarmEntity> alarms, int todayDay, LocalDateTime todayEffectiveWakeAt) {
         List<DailyAlarmItemResponse> items = alarms.stream()
                 .map(alarm -> DailyAlarmItemResponse.builder()
                         .dayOfWeek(alarm.getDayOfWeek())

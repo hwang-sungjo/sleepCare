@@ -14,7 +14,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 /**
  * 1분 단위로 외부(라즈베리파이 등)에서 푸시되는 환경 지표 (조도, 온도, 습도).
@@ -40,9 +40,9 @@ public class RealtimeMetricEntity {
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 }

@@ -20,7 +20,8 @@ import org.springframework.web.client.RestTemplate;
 import project.server.dao.FitbitRepository;
 import project.server.dao.entity.FitbitEntity;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Base64;
 
 /**
@@ -28,7 +29,7 @@ import java.util.Base64;
  *
  * <p>
  * {@link #refreshAndPersist(project.server.dao.entity.FitbitEntity)} 는 refresh token 교환 결과를 즉시 DB 에 반영하고
- * 새 access token 문자열을 돌려주며, 토큰 만료 순간은 {@link Instant} 로 저장된다.
+ * 새 access token 문자열을 돌려주며, 토큰 만료 순간은 한국 벽시계 {@link LocalDateTime} 으로 저장된다.
  * {@link #callApiAsJson(String, String)} 은 Bearer access 로 GET 결과를 Jackson 트리로 받는 단순 래핑이다.
  * </p>
  */
@@ -42,6 +43,7 @@ public class FitbitAuthService {
     private static final String CLIENT_SECRET = "aec249d64f0909ed455004ace1ebb5eb";
     private static final String TOKEN_URL = "https://api.fitbit.com/oauth2/token";
     private static final long DEFAULT_EXPIRES_IN_SECONDS = 28_800L;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final RestTemplate restTemplate;
     private final FitbitRepository fitbitRepository;
@@ -79,7 +81,7 @@ public class FitbitAuthService {
                     return null;
                 }
 
-                Instant expiresAt = Instant.now()
+                LocalDateTime expiresAt = LocalDateTime.now(KST)
                         .plusSeconds(expiresIn > 0 ? expiresIn : DEFAULT_EXPIRES_IN_SECONDS);
                 entity.setFitbitAccessToken(newAccess);
                 entity.setFitbitRefreshToken(newRefresh);

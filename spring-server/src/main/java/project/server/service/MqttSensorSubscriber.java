@@ -22,6 +22,8 @@ import project.server.dao.entity.RealtimeMetricEntity;
 import project.server.util.FitbitInstantParser;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 /**
@@ -70,6 +72,8 @@ public class MqttSensorSubscriber {
 
     @Value("${app.mqtt.target-user-id:1}")
     private Long targetUserId;
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private MqttClient client;
 
@@ -137,7 +141,7 @@ public class MqttSensorSubscriber {
                     .temperature(temperature)
                     .humidity(humidity)
                     .build();
-            parseSensorPayloadInstant(node).ifPresent(ts -> {
+            parseSensorPayloadTime(node).ifPresent(ts -> {
                 row.setCreatedAt(ts);
                 row.setUpdatedAt(ts);
             });
@@ -152,9 +156,9 @@ public class MqttSensorSubscriber {
 
     /**
      * 라즈베리 JSON 에서 측정 시각을 꺼낸다. 텍스트는 {@link FitbitInstantParser}(오프셋 없으면 서울 벽시계),
-     * 정수/실수 {@code timestamp} 는 Unix 초 또는 밀리초로 본다.
+     * 정수/실수 {@code timestamp} 는 Unix 초 또는 밀리초 에포크를 한국 벽시계 {@link LocalDateTime} 으로 변환한다.
      */
-    private static Optional<Instant> parseSensorPayloadInstant(JsonNode node) {
+    private static Optional<LocalDateTime> parseSensorPayloadTime(JsonNode node) {
         if (node == null || node.isNull()) {
             return Optional.empty();
         }
@@ -165,15 +169,15 @@ public class MqttSensorSubscriber {
             }
             JsonNode v = node.get(key);
             if (v.isTextual()) {
-                Optional<Instant> parsed = FitbitInstantParser.parseFlexibleInstant(v.asText());
+                Optional<LocalDateTime> parsed = FitbitInstantParser.parseFlexibleLocalDateTime(v.asText());
                 if (parsed.isPresent()) {
                     return parsed;
                 }
             }
             if (v.isIntegralNumber()) {
                 long n = v.asLong();
-                return Optional.of(
-                        n > 1_000_000_000_000L ? Instant.ofEpochMilli(n) : Instant.ofEpochSecond(n));
+                Instant epoch = n > 1_000_000_000_000L ? Instant.ofEpochMilli(n) : Instant.ofEpochSecond(n);
+                return Optional.of(LocalDateTime.ofInstant(epoch, KST));
             }
         }
         return Optional.empty();

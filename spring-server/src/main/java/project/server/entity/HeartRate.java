@@ -12,7 +12,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 
 /**
@@ -31,14 +31,14 @@ public class HeartRate {
     private LocalDate recordDate;
     /** 해당 분 버킷을 식별하는 절대 순간(KST 달력 일자 + intraday time 으로부터 산출). */
     @Column(nullable = false)
-    private Instant recordTime;
+    private LocalDateTime recordTime;
     private Integer bpm;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 }

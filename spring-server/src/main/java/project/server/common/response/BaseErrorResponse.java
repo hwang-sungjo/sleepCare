@@ -6,7 +6,8 @@ import lombok.Getter;
 import project.server.common.response.status.BaseExceptionResponseStatus;
 import project.server.common.response.status.ResponseStatus;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Getter
 @JsonPropertyOrder({ "code", "status", "message", "timestamp" })
@@ -22,8 +23,8 @@ public class BaseErrorResponse implements ResponseStatus {
     @Schema(description = "사용자에게 노출되는 에러 메시지", example = "이미 존재하는 닉네임입니다.")
     private final String message;
 
-    @Schema(description = "에러 발생 시각(UTC 기준 Instant, ISO-8601)", example = "2026-04-28T10:20:15.123Z")
-    private final Instant timestamp;
+    @Schema(description = "에러 발생 시각(한국 벽시계 기준 LocalDateTime)", example = "2026-04-28T19:20:15.123")
+    private final LocalDateTime timestamp;
 
     public BaseErrorResponse(ResponseStatus status) {
         ResponseStatus resolved =
@@ -31,7 +32,7 @@ public class BaseErrorResponse implements ResponseStatus {
         this.code = resolved.getCode();
         this.status = resolved.getStatus();
         this.message = resolved.getMessage();
-        this.timestamp = Instant.now();
+        this.timestamp = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     }
 
     public BaseErrorResponse(ResponseStatus status, String message) {
@@ -40,7 +41,7 @@ public class BaseErrorResponse implements ResponseStatus {
         this.code = resolved.getCode();
         this.status = resolved.getStatus();
         this.message = message;
-        this.timestamp = Instant.now();
+        this.timestamp = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     }
 
     @Override
