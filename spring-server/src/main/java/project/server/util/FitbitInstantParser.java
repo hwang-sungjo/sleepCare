@@ -15,7 +15,8 @@ import java.util.Optional;
  * Fitbit REST JSON 에서 문자열 형태로 내려오는 시각을 {@link Instant} 하나로 고정하기 위한 파서 묶음.
  *
  * <p>
- * 타임존이 없는 문자열은 서울({@link #DEFAULT_PARSE_ZONE}) 달력 벽 위에 놓였다고 가정하여 변환한다.
+ * 오프셋·{@code Z} 가 포함된 ISO 문자열은 그대로 표준 해석한다.
+ * 타임존이 없는 로컬 날시 문자열은 <strong>한국(서울) 벽시계</strong>로 해석한다.
  * 심박 intraday 는 "해당 로컬일 + 시:분(:초)" 조합이라 별도 메서드를 둔다.
  * </p>
  */

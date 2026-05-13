@@ -29,7 +29,7 @@ import java.util.Set;
  * <h2>설계 근거 (요약)</h2>
  * <ol>
  * <li><b>적응형 OFF:</b> {@code adaptive_enabled == false} 이면 수면 단계 탐색·윈도 탐색을 하지 않는다.
- * 오늘의 목표 벽시각({@link AlarmWakeAtHelper#todayWakeInstant(java.time.LocalTime, ZoneId)})
+ * 오늘의 목표 벽시각({@link AlarmWakeAtHelper#nearestUpcomingWakeInstant(int, java.time.LocalTime, java.time.ZoneId)})
  * 과 동등한 순간으로만 맞추고 저장 후 종료한다.</li>
  * <li><b>windowEnd:</b> KST 로 오늘 {@link LocalDate} + {@link AlarmEntity#getBaseWakeTime()} →
  * {@link ZonedDateTime#of(LocalDate, java.time.LocalTime, ZoneId)} 후 {@link Instant}.</li>
@@ -91,7 +91,8 @@ public class DynamicAlarmService {
 
         // ① 적응형 비활성: 동적 창 검색 없이 오늘 base 순간만 유지 후 종료.
         if (Boolean.FALSE.equals(alarm.getAdaptiveEnabled())) {
-            alarm.setDynamicWakeAt(AlarmWakeAtHelper.todayWakeInstant(alarm.getBaseWakeTime(), DEFAULT_ZONE));
+            alarm.setDynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeInstant(
+                    alarm.getDayOfWeek(), alarm.getBaseWakeTime(), DEFAULT_ZONE));
             persistDynamicAlarm(userId, alarm);
             return;
         }

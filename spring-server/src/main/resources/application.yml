@@ -18,6 +18,8 @@ spring:
     username: ${DATASOURCE_USERNAME_LOCAL}
     password: ${DATASOURCE_PASSWORD_LOCAL}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-init-sql: SET time_zone = '+09:00'
     dbcp2:
       validation-query: select 1
   sql:
@@ -37,6 +39,8 @@ spring:
     username: ${DATASOURCE_USERNAME_DEV}
     password: ${DATASOURCE_PASSWORD_DEV}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-init-sql: SET time_zone = '+09:00'
     dbcp2:
       validation-query: select 1
   sql:
@@ -56,6 +60,8 @@ spring:
     username: ${DATASOURCE_USERNAME_PROD}
     password: ${DATASOURCE_PASSWORD_PROD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-init-sql: SET time_zone = '+09:00'
     dbcp2:
       validation-query: select 1
   sql:

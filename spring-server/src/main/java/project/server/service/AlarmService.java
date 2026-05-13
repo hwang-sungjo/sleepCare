@@ -76,10 +76,11 @@ public class AlarmService {
         int todayDow = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();
         if (alarm.getDayOfWeek() == todayDow) {
             if (!Boolean.TRUE.equals(request.getRecomputeDynamicNow())) {
-                alarm.setDynamicWakeAt(AlarmWakeAtHelper.todayWakeInstant(alarm.getBaseWakeTime(), DEFAULT_ZONE));
+                alarm.setDynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeInstant(
+                        alarm.getDayOfWeek(), alarm.getBaseWakeTime(), DEFAULT_ZONE));
             }
         } else {
-            alarm.setDynamicWakeAt(AlarmWakeAtHelper.nearestOccurrenceWakeInstant(
+            alarm.setDynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeInstant(
                     alarm.getDayOfWeek(), alarm.getBaseWakeTime(), DEFAULT_ZONE));
         }
         alarmRepository.save(alarm);
@@ -122,7 +123,7 @@ public class AlarmService {
                 .userId(userId)
                 .dayOfWeek(dayOfWeek)
                 .baseWakeTime(base)
-                .dynamicWakeAt(AlarmWakeAtHelper.nearestOccurrenceWakeInstant(dayOfWeek, base, DEFAULT_ZONE))
+                .dynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeInstant(dayOfWeek, base, DEFAULT_ZONE))
                 .adaptiveEnabled(true)
                 .windowMinutesBefore(30)
                 .build();

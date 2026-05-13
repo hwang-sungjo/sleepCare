@@ -19,6 +19,10 @@ import org.springframework.stereotype.Service;
 
 import project.server.dao.RealtimeMetricRepository;
 import project.server.dao.entity.RealtimeMetricEntity;
+import project.server.util.FitbitInstantParser;
+
+import java.time.Instant;
+import java.util.Optional;
 
 /**
  * 라즈베리파이 MQTT 브로커 구독자.
@@ -30,6 +34,9 @@ import project.server.dao.entity.RealtimeMetricEntity;
  * </p>
  * <ol>
  * <li>JSON 을 파싱해 {@code temperature/humidity/illuminance} 를 얻는다.</li>
+ * <li>선택 필드 {@code timestamp} / {@code recorded_at} / {@code time}(문자열) 또는 숫자 {@code timestamp} 가 있으면
+ * 측정 시각으로 쓴다(문자열에 오프셋이 없으면 <strong>한국(서울) 벽시계</strong>, 숫자는 Unix 초·밀리초 에포크).
+ * 없으면 JPA 가 수신 시각을 채운다.</li>
  * <li>위 값을 합쳐 {@code realtime_metric} 한 행을 insert 한다.</li>
  * </ol>
  *
@@ -130,6 +137,10 @@ public class MqttSensorSubscriber {
                     .temperature(temperature)
                     .humidity(humidity)
                     .build();
+            parseSensorPayloadInstant(node).ifPresent(ts -> {
+                row.setCreatedAt(ts);
+                row.setUpdatedAt(ts);
+            });
             realtimeMetricRepository.save(row);
 
             log.info("[MQTT] saved realtime_metric userId={} t={} h={} lux={}",
@@ -137,6 +148,35 @@ public class MqttSensorSubscriber {
         } catch (Exception e) {
             log.warn("[MQTT] failed to handle message: {}", e.getMessage());
         }
+    }
+
+    /**
+     * 라즈베리 JSON 에서 측정 시각을 꺼낸다. 텍스트는 {@link FitbitInstantParser}(오프셋 없으면 서울 벽시계),
+     * 정수/실수 {@code timestamp} 는 Unix 초 또는 밀리초로 본다.
+     */
+    private static Optional<Instant> parseSensorPayloadInstant(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return Optional.empty();
+        }
+        String[] textKeys = {"timestamp", "recorded_at", "recordedAt", "time"};
+        for (String key : textKeys) {
+            if (!node.has(key) || node.get(key).isNull()) {
+                continue;
+            }
+            JsonNode v = node.get(key);
+            if (v.isTextual()) {
+                Optional<Instant> parsed = FitbitInstantParser.parseFlexibleInstant(v.asText());
+                if (parsed.isPresent()) {
+                    return parsed;
+                }
+            }
+            if (v.isIntegralNumber()) {
+                long n = v.asLong();
+                return Optional.of(
+                        n > 1_000_000_000_000L ? Instant.ofEpochMilli(n) : Instant.ofEpochSecond(n));
+            }
+        }
+        return Optional.empty();
     }
 
     private static Double readDouble(JsonNode node, String field) {

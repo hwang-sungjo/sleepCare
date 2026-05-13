@@ -42,7 +42,7 @@ public class AlarmEntity {
     private LocalTime baseWakeTime;
 
     /**
-     * 그 요일 행 기준 현재 채택된 실제 알람 발생 후보 시각(UTC 기준 {@link Instant}).
+     * 그 요일 행 기준 현재 채택된 실제 알람 발생 후보 시각({@link Instant}; 계산·저장은 한국 시간대 기준 벽시계와 조합).
      */
     @Column(nullable = false)
     private Instant dynamicWakeAt;

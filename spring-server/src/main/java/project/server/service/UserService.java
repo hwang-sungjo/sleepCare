@@ -31,6 +31,8 @@ import java.util.stream.IntStream;
  *
  * <p>
  * 가입과 동시에 사용자별 알람 7건과 Fitbit 토큰 보관 행이 함께 생성된다.
+ * 기본 알람은 <strong>한국(Asia/Seoul) 달력</strong> 기준 매주 해당 요일 <strong>07:30</strong>의
+ * <em>아직 지나지 않은</em> 다음 순간으로 {@code dynamic_wake_at} 을 맞춘다.
  * Fitbit 토큰은 본래 가입자의 OAuth 동의를 거쳐 받아오지만,
  * 데모에서는 user_id=1 한정으로 미리 알고 있는 access/refresh token을 그대로 채워넣는다.
  * </p>
@@ -77,7 +79,7 @@ public class UserService {
                         .userId(saved.getUserId())
                         .dayOfWeek(day)
                         .baseWakeTime(base)
-                        .dynamicWakeAt(AlarmWakeAtHelper.nearestOccurrenceWakeInstant(day, base, ALARM_ZONE))
+                        .dynamicWakeAt(AlarmWakeAtHelper.nearestUpcomingWakeInstant(day, base, ALARM_ZONE))
                         .adaptiveEnabled(true)
                         .windowMinutesBefore(30)
                         .build());

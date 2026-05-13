@@ -42,6 +42,7 @@ import java.util.Optional;
  *
  * <p>
  * 배치 일자축과 심박 증분은 KST 기준 {@link LocalDate} / 분 범위로 맞춘다.
+ * Fitbit JSON 시각 문자열은 {@link FitbitInstantParser} 규칙을 따른다(오프셋 없으면 서울 벽시계).
  * </p>
  *
  * <p><b>심박({@link HeartRate})</b></p>
