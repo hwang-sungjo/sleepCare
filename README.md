@@ -12,26 +12,32 @@
 저장소 루트에서 한 줄이면 백엔드(:9000) + 프론트엔드(:5173)가 동시에 뜹니다.
 
 ```bash
-npm install         # 처음 한 번 — concurrently + frontend 의존성 설치
+npm run install:all   # 처음 한 번 — 루트 concurrently + frontend 의존성
+npm install           # 이후 루트 의존성만 갱신할 때
 npm run dev
 ```
 
 출력은 `[backend]` / `[frontend]` 라벨이 붙은 채 한 화면에 보이고, `Ctrl+C` 한 번이면 둘 다 종료됩니다.
 
-> Windows의 PowerShell / cmd / Git Bash, macOS / Linux 어디서 실행해도 동일하게 동작합니다 (`scripts/start-backend.js`가 OS별로 알맞은 gradle 래퍼를 호출).
+> Windows의 PowerShell / cmd / Git Bash, macOS / Linux 어디서 실행해도 동일하게 동작합니다 (`scripts/run-backend.cjs`가 `spring-server` 안의 Gradle 래퍼를 호출합니다. 터미널에서 `cd` 할 필요 없음).
 
-### 개별 실행
+### 개별 실행 (루트에서)
 
 ```bash
-# 백엔드만 (로컬 H2)
-cd spring-server && ./gradlew bootRun -Pprofile=local-h2
-# 프론트만
-cd frontend && npm run dev
+npm run dev:backend    # spring-server Gradle bootRun (프로파일: SPRING_PROFILE 또는 기본 local-h2)
+npm run dev:frontend   # Vite — 루트 `.env` 의 VITE_API_TARGET 사용
+```
+
+루트에서 Gradle을 직접 쓰고 싶다면(선택):
+
+```bash
+node scripts/run-gradle.cjs bootRun -Pprofile=local-h2
+node scripts/run-gradle.cjs build
 ```
 
 - 백엔드: `http://localhost:9000`  /  H2 콘솔: `http://localhost:9000/h2-console` (JDBC `jdbc:h2:file:./data/sleepcare`, User `sa`, 비밀번호 비움)
 - 프론트: `http://localhost:5173`
-- 다른 프로파일로 백엔드 띄우기: `./gradlew bootRun -Pprofile=prod`
+- 다른 프로파일로 백엔드: `SPRING_PROFILE=prod npm run dev:backend` (Windows PowerShell: `$env:SPRING_PROFILE='prod'; npm run dev:backend`)
 
 > **포트 충돌 시**
 > ```powershell
@@ -41,21 +47,19 @@ cd frontend && npm run dev
 
 ---
 
-## 🌐 백엔드 연결 설정
+## 🌐 환경 변수 (루트 단일 `.env`)
 
-프론트엔드는 `frontend/.env`의 `VITE_API_TARGET`으로 연결할 백엔드를 지정합니다.
+백엔드와 프론트가 **저장소 루트**의 `.env`를 공유합니다. 템플릿은 `.env.sample`을 복사해 `.env`를 만든 뒤 값을 채우면 됩니다.
 
-```
-# frontend/.env
-VITE_API_TARGET=http://localhost:9000      # 로컬 백엔드로 전환 시 이 줄 사용
-```
+- `VITE_API_TARGET`: Vite 프록시가 `/api`를 넘길 백엔드 베이스 URL (기본 `http://localhost:9000`)
+- DB·JWT 등은 `spring-server`의 `application.yml`이 참조하는 변수명과 동일하게 설정합니다.
 
-변경 후 프론트 재시작(`npm run dev`)만 하면 됩니다. 코드 수정은 불필요합니다.
+값을 바꾼 뒤에는 해당 프로세스를 재시작하면 됩니다.
 
 ### 같은 WiFi의 다른 기기에서 접속
 
 ```bash
-cd frontend && npm run dev -- --host
+npm run dev:frontend -- --host
 ```
 
 노트북 IP 확인(PowerShell): `Get-NetIPAddress -AddressFamily IPv4 | Select InterfaceAlias, IPAddress`
@@ -130,11 +134,12 @@ SELECT * FROM sleep_records;
 
 ```
 sleepCare/
-├── package.json                        # 루트: `npm run dev`로 두 서버 동시 실행
+├── .env.sample                         # 루트 `.env` 템플릿 (백엔드 + VITE_*)
+├── package.json                        # 루트: `npm run dev` 등 (하위 폴더로 cd 불필요)
 ├── scripts/
-│   └── start-backend.js                # OS별 gradle 래퍼 호출 (셸 의존 없음)
+│   ├── run-backend.cjs                 # `bootRun` (루트에서 실행)
+│   └── run-gradle.cjs                  # 기타 Gradle 태스크 (`build`, `test` …)
 ├── frontend/                           # React 클라이언트
-│   ├── .env                            # VITE_API_TARGET (백엔드 주소)
 │   ├── src/
 │   │   ├── api/                        # auth, alarm, dashboard, user (클라이언트 모듈)
 │   │   ├── components/                 # Button, InputField, AlarmCard …

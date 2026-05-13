@@ -34,7 +34,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    @Profile({ "local", "dev" })
+    @Profile({ "local", "dev", "local-h2-db" })
     public SecurityFilterChain devFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
