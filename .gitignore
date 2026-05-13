@@ -2,6 +2,9 @@
 .env
 *.pem
 
+# H2 file DB (bootRun workingDir = repo root)
+/data/
+
 # IDE - Visual Studio Code
 .vscode/
 
@@ -11,6 +14,11 @@
 *.iml
 *.ipr
 out/
+
+# IDE - Cursor
+.cursor/
+.cursorrules
+docs/
 
 # Gradle and Build Output
 .gradle/
@@ -31,3 +39,6 @@ dist/
 .DS_Store
 Thumbs.db
 *.pyc
+
+# Database
+database/results/

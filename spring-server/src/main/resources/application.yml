@@ -2,6 +2,7 @@ spring:
   profiles:
     group:
       "local": "localDB, devPort, secret, web-mvc"
+      "local-h2": "devPort, secret, web-mvc, local-h2-db"
       "dev": "devDB, devPort, secret, web-mvc"
       "prod": "prodDB, prodPort, secret, web-mvc"
 
@@ -14,8 +15,8 @@ spring:
 
   datasource:
     url: ${DATASOURCE_URL_LOCAL}
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
+    username: ${DATASOURCE_USERNAME_LOCAL}
+    password: ${DATASOURCE_PASSWORD_LOCAL}
     driver-class-name: com.mysql.cj.jdbc.Driver
     dbcp2:
       validation-query: select 1
@@ -33,8 +34,8 @@ spring:
 
   datasource:
     url: ${DATASOURCE_URL_DEV}
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
+    username: ${DATASOURCE_USERNAME_DEV}
+    password: ${DATASOURCE_PASSWORD_DEV}
     driver-class-name: com.mysql.cj.jdbc.Driver
     dbcp2:
       validation-query: select 1
@@ -52,8 +53,8 @@ spring:
 
   datasource:
     url: ${DATASOURCE_URL_PROD}
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
+    username: ${DATASOURCE_USERNAME_PROD}
+    password: ${DATASOURCE_PASSWORD_PROD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     dbcp2:
       validation-query: select 1
@@ -62,6 +63,31 @@ spring:
       platform: mysql
       mode: never
 
+---
+
+spring:
+  config:
+    activate:
+      on-profile: "local-h2-db"
+
+  datasource:
+    url: jdbc:h2:file:./data/sleepcare;DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+    username: ${DATASOURCE_USERNAME_LOCAL}
+    password: ${DATASOURCE_PASSWORD_LOCAL}
+  h2:
+    console:
+      enabled: true
+  sql:
+    init:
+      mode: always
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
 ---
 
 spring:

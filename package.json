@@ -1,0 +1,18 @@
+{
+  "name": "sleepcare",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "node scripts/run-backend.cjs",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend",
+    "lint:frontend": "npm run lint --prefix frontend",
+    "preview:frontend": "npm run preview --prefix frontend",
+    "build:backend": "node scripts/run-gradle.cjs build",
+    "test:backend": "node scripts/run-gradle.cjs test",
+    "install:all": "npm install && npm install --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
