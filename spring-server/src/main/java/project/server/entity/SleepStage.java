@@ -12,7 +12,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 
 /**
@@ -30,15 +30,15 @@ public class SleepStage {
     private Long userId;
     private LocalDate recordDate;
     @Column(nullable = false)
-    private Instant startTime;
+    private LocalDateTime startTime;
     private Integer durationSeconds;
     private String stageLevel;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 }

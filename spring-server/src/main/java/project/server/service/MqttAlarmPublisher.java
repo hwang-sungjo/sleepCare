@@ -14,7 +14,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -24,7 +25,7 @@ import java.util.Map;
  *
  * <p>
  * 제어 토픽({@link #topic}): {@code ON} / {@code OFF} 로 즉시 부저 제어.
- * 일정 토픽({@link #scheduleTopic}): JSON 으로 다음 기상 {@link Instant} 전달 — 파이 측에서 해당 시각에 울림.
+ * 일정 토픽({@link #scheduleTopic}): JSON 으로 다음 기상 시각 전달 — 파이 측에서 해당 시각에 울림.
  * </p>
  */
 @Slf4j
@@ -34,8 +35,10 @@ public class MqttAlarmPublisher {
     private static final String CMD_ON = "ON";
     private static final String CMD_OFF = "OFF";
 
-    /** HTTP API 와 동일 규칙으로 instant 문자열 직렬화 시 사용. */
-    private static final DateTimeFormatter ISO_INSTANT = DateTimeFormatter.ISO_INSTANT;
+    private static final ZoneId SCHEDULE_ZONE = ZoneId.of("Asia/Seoul");
+
+    /** Pi 쪽 {@code datetime.fromisoformat} 호환을 위해 한국 오프셋이 붙은 ISO 문자열로 직렬화. */
+    private static final DateTimeFormatter WAKE_AT_FORMAT = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -56,7 +59,7 @@ public class MqttAlarmPublisher {
     private String scheduleTopic;
 
     /**
-     * false 이면 {@link #publishWakeSchedule(long, Instant)} 가 아무 것도 보내지 않는다 (브로커 테스트 등).
+     * false 이면 {@link #publishWakeSchedule(long, LocalDateTime)} 가 아무 것도 보내지 않는다 (브로커 테스트 등).
      */
     @Value("${app.mqtt.alarm.publish-schedule-to-raspberry:true}")
     private boolean publishScheduleToRaspberry;
@@ -119,16 +122,16 @@ public class MqttAlarmPublisher {
      * 라즈베리파이가 구독하는 일정 토픽으로 다음 기상 시각(JSON)을 보낸다.
      *
      * <p>
-     * 페이로드 예시: {@code {"type":"wake_schedule","userId":1,"wakeAt":"2026-04-30T22:35:12.345Z"}}
-     * {@code wakeAt} 은 UTC 기준 ISO-8601.
+     * 페이로드 예시: {@code {"type":"wake_schedule","userId":1,"wakeAt":"2026-04-30T07:30:00+09:00"}}
+     * {@code wakeAt} 은 서버가 한국(Asia/Seoul) 벽시계로 보관한 시각을 오프셋 포함 ISO-8601 로 표현한 값이다.
      * </p>
      */
-    public void publishWakeSchedule(long userId, Instant wakeInstant) {
+    public void publishWakeSchedule(long userId, LocalDateTime wakeAt) {
         if (!publishScheduleToRaspberry) {
             return;
         }
-        if (wakeInstant == null) {
-            log.warn("[MQTT/Alarm] publishWakeSchedule skipped — wakeInstant null");
+        if (wakeAt == null) {
+            log.warn("[MQTT/Alarm] publishWakeSchedule skipped — wakeAt null");
             return;
         }
         if (client == null || !client.isConnected()) {
@@ -139,11 +142,12 @@ public class MqttAlarmPublisher {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("type", "wake_schedule");
             payload.put("userId", userId);
-            payload.put("wakeAt", ISO_INSTANT.format(wakeInstant));
+            String wakeAtStr = wakeAt.atZone(SCHEDULE_ZONE).format(WAKE_AT_FORMAT);
+            payload.put("wakeAt", wakeAtStr);
             byte[] body = objectMapper.writeValueAsBytes(payload);
             client.publish(scheduleTopic, body, 1, false);
             log.info("[MQTT/Alarm] published wake_schedule user={} wakeAt={} topic={}",
-                    userId, ISO_INSTANT.format(wakeInstant), scheduleTopic);
+                    userId, wakeAtStr, scheduleTopic);
         } catch (Exception e) {
             log.warn("[MQTT/Alarm] schedule publish failed user={}: {}", userId, e.getMessage());
         }

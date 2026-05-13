@@ -3,29 +3,33 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+_DATABASE_DIR = Path(__file__).resolve().parent.parent
+if str(_DATABASE_DIR) not in sys.path:
+    sys.path.insert(0, str(_DATABASE_DIR))
 
 from csv_generators.dotenv_loader import apply_dotenv, resolve_dotenv_path
 from csv_generators.registry import ALL_GENERATORS, TABLE_REGISTRY
+
+_RESULTS_DIR = _DATABASE_DIR / "results"
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Generate dummy CSV files (one per table). Loads optional .env for secrets."
+            "Generate dummy CSV files (one per table) under this repo's database/results/. "
+            "Loads optional .env for secrets."
         ),
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("."),
-        help="Directory where CSV files are written (created if missing).",
     )
     parser.add_argument(
         "--env-file",
         type=Path,
         default=None,
-        help="Explicit path to a .env file (searches parents of cwd/output-dir by default).",
+        help=(
+            "Explicit path to a .env file (searches parents of cwd and database/results by default)."
+        ),
     )
     parser.add_argument(
         "--tables",
@@ -42,7 +46,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     """Runs generators for all or selected tables."""
     args = _parse_args()
-    output_dir = args.output_dir.resolve()
+    output_dir = _RESULTS_DIR.resolve()
 
     dotenv_path = resolve_dotenv_path(output_dir, args.env_file)
     if dotenv_path is not None:
