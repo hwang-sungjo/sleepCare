@@ -2,6 +2,8 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.0.6'
 	id 'io.spring.dependency-management' version '1.1.0'
+	// Lambda 호환 fat jar (클래스가 jar root 에 위치, BOOT-INF/classes/ 사용 X)
+	id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group = 'com.example'
@@ -66,4 +68,36 @@ tasks.named('test') {
 bootRun {
 	workingDir = file('..')
 	args = ["--spring.profiles.active=${project.findProperty('profile') ?: 'local-h2'}"]
+}
+
+// Lambda 배포용 fat jar — 클래스가 jar root 에 위치 (Lambda Java runtime 호환)
+// 사용: gradlew clean shadowJar -Pprofile=lambda
+//   → build/libs/server-0.0.1-SNAPSHOT-all.jar (Lambda 콘솔 업로드)
+shadowJar {
+	archiveClassifier = 'all'
+	mergeServiceFiles()
+
+	// ★ Spring Boot 3.x 의 autoconfig 메타파일들 — 여러 의존성 jar 에서 같은 경로로 들어있어
+	//   shadowJar 가 기본적으로 첫 파일만 살리는데, 그러면 Spring 부팅 시 절반의 autoconfig 가 사라져
+	//   Runtime.BadFunctionCode (static init 실패) 발생. append 로 모든 jar 의 내용을 합쳐야 함.
+	append 'META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports'
+	append 'META-INF/spring/org.springframework.boot.env.PropertySourceLoader.imports'
+	append 'META-INF/spring/org.springframework.boot.diagnostics.FailureAnalyzer.imports'
+	append 'META-INF/spring/org.springframework.boot.context.properties.ConfigurationProperties.imports'
+	append 'META-INF/spring.handlers'
+	append 'META-INF/spring.schemas'
+	append 'META-INF/spring.tooling'
+
+	// spring.factories (Spring Boot 2.x 호환, 일부 transitive 에 남아있음) — Properties 형식이라 별도 transformer (FQN 사용)
+	transform(com.github.jengelman.gradle.plugins.shadow.transformers.PropertiesFileTransformer) {
+		paths = ['META-INF/spring.factories']
+		mergeStrategy = 'append'
+	}
+
+	manifest {
+		attributes 'Main-Class': 'project.server.SleepCareServerApplication'
+	}
+	exclude 'META-INF/*.SF'
+	exclude 'META-INF/*.DSA'
+	exclude 'META-INF/*.RSA'
 }
