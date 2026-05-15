@@ -5,33 +5,77 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import HomePage from './pages/HomePage';
 import SetAlarmPage from './pages/SetAlarmPage';
+import { login as apiLogin, signup as apiSignup } from './api/auth';
+import { ApiError, clearToken, setToken } from './api/client';
 
 export default function App() {
     const [page, setPage] = useState<PageName>('login');
-    const [userId, setUserId] = useState('');
+    const [nickname, setNickname] = useState('');
     const [password, setPassword] = useState('');
-    const [alarmTime, setAlarmTime] = useState('07:30');
     const { notification, showNotification } = useNotification();
 
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (userId && password) {
-            setPage('home');
-            showNotification('로그인에 성공했습니다.');
+    const showError = (e: unknown, fallback: string) => {
+        if (e instanceof ApiError) {
+            showNotification(e.message);
         } else {
-            showNotification('아이디와 비밀번호를 입력해주세요.');
+            showNotification(fallback);
         }
     };
 
-    const handleSignup = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        showNotification('회원가입이 완료되었습니다.');
+        if (!nickname || !password) {
+            showNotification('닉네임과 비밀번호를 입력해주세요.');
+            return;
+        }
+        try {
+            const res = await apiLogin(nickname, password);
+            setToken(res.jwt);
+            setPage('home');
+            showNotification('로그인에 성공했습니다.');
+        } catch (err) {
+            showError(err, '로그인 중 오류가 발생했습니다.');
+        }
+    };
+
+    const handleSignup = async (
+        signupNickname: string,
+        signupPassword: string,
+        signupPasswordConfirm: string,
+    ) => {
+        if (!signupNickname || !signupPassword) {
+            showNotification('닉네임과 비밀번호를 입력해주세요.');
+            return;
+        }
+        if (signupPassword !== signupPasswordConfirm) {
+            showNotification('비밀번호가 일치하지 않습니다.');
+            return;
+        }
+        try {
+            const res = await apiSignup({
+                nickname: signupNickname,
+                password: signupPassword,
+            });
+            // 원격 백엔드는 회원가입 시 즉시 토큰을 발급합니다.
+            setToken(res.jwt);
+            setNickname(signupNickname);
+            setPassword('');
+            setPage('home');
+            showNotification('회원가입이 완료되었습니다.');
+        } catch (err) {
+            showError(err, '회원가입 중 오류가 발생했습니다.');
+        }
+    };
+
+    const handleLogout = () => {
+        clearToken();
+        setNickname('');
+        setPassword('');
         setPage('login');
     };
 
-    const handleSetAlarm = (e: React.FormEvent) => {
-        e.preventDefault();
-        showNotification('알람이 성공적으로 설정되었습니다.');
+    const handleAlarmSaved = (message: string) => {
+        showNotification(message);
         setPage('home');
     };
 
@@ -39,10 +83,10 @@ export default function App() {
         case 'login':
             return (
                 <LoginPage
-                    userId={userId}
+                    nickname={nickname}
                     password={password}
                     notification={notification}
-                    onUserIdChange={setUserId}
+                    onNicknameChange={setNickname}
                     onPasswordChange={setPassword}
                     onLogin={handleLogin}
                     onNavigate={setPage}
@@ -59,18 +103,18 @@ export default function App() {
         case 'home':
             return (
                 <HomePage
-                    alarmTime={alarmTime}
+                    nickname={nickname}
                     notification={notification}
                     onNavigate={setPage}
+                    onLogout={handleLogout}
+                    onNicknameLoaded={setNickname}
                 />
             );
         case 'setAlarm':
             return (
                 <SetAlarmPage
-                    alarmTime={alarmTime}
                     notification={notification}
-                    onAlarmTimeChange={setAlarmTime}
-                    onSave={handleSetAlarm}
+                    onSaved={handleAlarmSaved}
                     onBack={() => setPage('home')}
                 />
             );

@@ -5,8 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import project.server.common.exception.UserException;
 import project.server.common.response.BaseErrorResponse;
 
-import static project.server.common.response.status.BaseExceptionResponseStatus.INVALID_USER_VALUE;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -21,7 +19,7 @@ public class UserExceptionControllerAdvice {
     @ExceptionHandler(UserException.class)
     public BaseErrorResponse handle_UserException(UserException e) {
         log.error("[handle_UserException]", e);
-        return new BaseErrorResponse(INVALID_USER_VALUE, e.getMessage());
+        return new BaseErrorResponse(e.getExceptionStatus(), e.getMessage());
     }
 
 }

@@ -2,6 +2,9 @@
 .env
 *.pem
 
+# H2 file DB (bootRun workingDir = repo root)
+/data/
+
 # IDE - Visual Studio Code
 .vscode/
 
@@ -12,11 +15,24 @@
 *.ipr
 out/
 
+# IDE - Cursor
+.cursor/
+.cursorrules
+docs/
+
+# Claude Code (local-only memory, plans, manuals)
+.claude/
+.claude.json
+.claude.local.json
+CLAUDE.md
+CLAUDE.local.md
+
 # Gradle and Build Output
 .gradle/
 build/
 spring-server/.gradle/
 spring-server/build/
+spring-server/bin/
 
 # Keep Gradle Wrapper jar
 !**/gradle/wrapper/gradle-wrapper.jar
@@ -29,3 +45,7 @@ dist/
 # System Files
 .DS_Store
 Thumbs.db
+*.pyc
+
+# Database
+database/results/

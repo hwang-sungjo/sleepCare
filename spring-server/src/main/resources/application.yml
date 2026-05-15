@@ -2,9 +2,10 @@ spring:
   profiles:
     group:
       "local": "localDB, devPort, secret, web-mvc"
-      "local-h2": "localh2DB, devPort, secret, web-mvc"
+      "local-h2": "devPort, secret, web-mvc, local-h2-db"
       "dev": "devDB, devPort, secret, web-mvc"
       "prod": "prodDB, prodPort, secret, web-mvc"
+      "lambda": "prodDB, secret, web-mvc"
 
 ---
 
@@ -15,32 +16,18 @@ spring:
 
   datasource:
     url: ${DATASOURCE_URL_LOCAL}
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
+    username: ${DATASOURCE_USERNAME_LOCAL}
+    password: ${DATASOURCE_PASSWORD_LOCAL}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-init-sql: SET time_zone = '+09:00'
     dbcp2:
       validation-query: select 1
   sql:
     init:
       platform: mysql
+      mode: never
 
----
-
-spring:
-  config:
-    activate:
-      on-profile: "localh2DB"
-
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=MYSQL;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
 ---
 
 spring:
@@ -50,14 +37,17 @@ spring:
 
   datasource:
     url: ${DATASOURCE_URL_DEV}
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
+    username: ${DATASOURCE_USERNAME_DEV}
+    password: ${DATASOURCE_PASSWORD_DEV}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-init-sql: SET time_zone = '+09:00'
     dbcp2:
       validation-query: select 1
   sql:
     init:
       platform: mysql
+      mode: never
 
 ---
 
@@ -68,15 +58,43 @@ spring:
 
   datasource:
     url: ${DATASOURCE_URL_PROD}
-    username: ${DATASOURCE_USERNAME}
-    password: ${DATASOURCE_PASSWORD}
+    username: ${DATASOURCE_USERNAME_PROD}
+    password: ${DATASOURCE_PASSWORD_PROD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-init-sql: SET time_zone = '+09:00'
     dbcp2:
       validation-query: select 1
   sql:
     init:
       platform: mysql
+      mode: never
 
+---
+
+spring:
+  config:
+    activate:
+      on-profile: "local-h2-db"
+
+  datasource:
+    url: jdbc:h2:file:./data/sleepcare;DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+    username: ${DATASOURCE_USERNAME_LOCAL}
+    password: ${DATASOURCE_PASSWORD_LOCAL}
+  h2:
+    console:
+      enabled: true
+  sql:
+    init:
+      mode: always
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
 ---
 
 spring:
@@ -115,6 +133,20 @@ spring:
     activate:
       on-profile: "web-mvc"
 
+  jackson:
+    time-zone: Asia/Seoul
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: Asia/Seoul
+
   mvc:
     throw-exception-if-no-handler-found: true
 
@@ -124,3 +156,52 @@ spring:
 
   messages:
     basename: errors
+
+app:
+  frontend-origin: ${FRONTEND_ORIGIN:*}
+  fitbit:
+    sync-interval-ms: ${FITBIT_SYNC_INTERVAL_MS:900000}
+  mqtt:
+    broker-url: ${MQTT_BROKER_URL:tcp://192.168.1.189:1883}
+    client-id: ${MQTT_CLIENT_ID:sleepcare-server}
+    topic: ${MQTT_TOPIC:iot/sensor/room/sumin}
+    target-user-id: ${MQTT_TARGET_USER_ID:1}
+    alarm:
+      client-id: ${MQTT_ALARM_CLIENT_ID:sleepcare-alarm}
+      topic: ${MQTT_ALARM_TOPIC:iot/alarm/control}
+      # 라즈베리가 구독해 다음 기상 순간(JSON wakeAt, UTC ISO)으로 울림 시각 동기화
+      schedule-topic: ${MQTT_ALARM_SCHEDULE_TOPIC:iot/alarm/schedule}
+      publish-schedule-to-raspberry: ${MQTT_PUBLISH_SCHEDULE_TO_RASPBERRY:true}
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: "lambda"
+
+  # Lambda 는 매 cold start 마다 새 컨테이너일 수 있으므로 connection pool 작게
+  datasource:
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
+      idle-timeout: 30000
+      connection-timeout: 5000
+      connection-init-sql: SET time_zone = '+09:00'
+      initialization-fail-timeout: -1
+
+  # schema.sql / data.sql 자동 실행 차단 (이미 RDS 에 적용됨)
+  sql:
+    init:
+      mode: never
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        # 부팅 시 DB 연결 없이 dialect 결정 → cold start 단축
+        temp:
+          use_jdbc_metadata_defaults: false
+

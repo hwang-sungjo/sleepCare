@@ -1,9 +1,16 @@
 package project.server.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import project.server.common.argument_resolver.PreAuthorize;
 import project.server.common.exception.UserException;
+import project.server.common.response.BaseErrorResponse;
 import project.server.common.response.BaseResponse;
 import project.server.dto.auth.LoginRequest;
 import project.server.dto.auth.LoginResponse;
@@ -20,30 +27,42 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/auth")
+@Tag(name = "Auth", description = "사용자 인증(로그인) API")
 public class AuthController {
 
-    private final AuthService authService;
+        private final AuthService authService;
 
-    /**
-     * 로그인
-     */
-    @PostMapping("/login")
-    public BaseResponse<LoginResponse> login(@Validated @RequestBody LoginRequest authRequest,
-            BindingResult bindingResult) {
-        log.info("[AuthController.login]");
-        if (bindingResult.hasErrors()) {
-            throw new UserException(INVALID_USER_VALUE, getErrorMessages(bindingResult));
+        @Operation(summary = "로그인", description =
+                        "등록된 닉네임에 대해 BCrypt 검증 후 서명된 JWT(Access)를 포함한 응답을 준다.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(schema = @Schema(implementation = LoginResponse.class))),
+                        @ApiResponse(responseCode = "400", description = "요청값 검증 실패 또는 사용자/비밀번호 불일치", content = @Content(schema = @Schema(implementation = BaseErrorResponse.class), examples = {
+                                        @ExampleObject(name = "ValidationFail", summary = "입력 누락", value = """
+                                                        {
+                                                          "code": 5000,
+                                                          "status": 400,
+                                                          "message": "nickname: {NotBlank}",
+                                                          "timestamp": "2026-04-28T19:20:15.123"
+                                                        }
+                                                        """),
+                                        @ExampleObject(name = "PasswordMismatch", summary = "비밀번호 불일치", value = """
+                                                        {
+                                                          "code": 4004,
+                                                          "status": 400,
+                                                          "message": "비밀번호가 일치하지 않습니다.",
+                                                          "timestamp": "2026-04-28T19:20:15.123"
+                                                        }
+                                                        """)
+                        }))
+        })
+        @PostMapping("/login")
+        public BaseResponse<LoginResponse> login(@Validated @RequestBody LoginRequest authRequest,
+                        BindingResult bindingResult) {
+                log.info("[AuthController.login]");
+                if (bindingResult.hasErrors()) {
+                        throw new UserException(INVALID_USER_VALUE, getErrorMessages(bindingResult));
+                }
+                return new BaseResponse<>(authService.login(authRequest));
         }
-        return new BaseResponse<>(authService.login(authRequest));
-    }
-
-    /**
-     * 인가(JWT 검증) 테스트
-     */
-    @GetMapping("/test")
-    public BaseResponse<String> checkAuthorization(@PreAuthorize long userId) {
-        log.info("[AuthController.checkAuthorization]");
-        return new BaseResponse<>("userId=" + userId);
-    }
 
 }
