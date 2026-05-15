@@ -19,6 +19,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -71,8 +72,8 @@ public class DynamicAlarmService {
 
     private final AlarmRepository alarmRepository;
     private final SleepStageRepository sleepStageRepository;
-    /** 동적 알람 저장 후 브로커로 라즈베리 일정 MQTT 발행까지 담당. */
-    private final MqttAlarmPublisher mqttAlarmPublisher;
+    /** 동적 알람 저장 후 브로커로 라즈베리 일정 MQTT 발행까지 담당. lambda 프로파일에서는 빈 없음 → Optional. */
+    private final Optional<MqttAlarmPublisher> mqttAlarmPublisher;
 
     @Transactional
     public void recalculateForUser(Long userId) {
@@ -130,7 +131,7 @@ public class DynamicAlarmService {
 
     private void persistDynamicAlarm(Long userId, AlarmEntity alarm) {
         alarmRepository.save(alarm);
-        mqttAlarmPublisher.publishWakeSchedule(userId, alarm.getDynamicWakeAt());
+        mqttAlarmPublisher.ifPresent(pub -> pub.publishWakeSchedule(userId, alarm.getDynamicWakeAt()));
     }
 
     /**

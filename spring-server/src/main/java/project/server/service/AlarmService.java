@@ -18,6 +18,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.IntStream;
 
 /**
@@ -39,7 +40,8 @@ public class AlarmService {
 
     private final AlarmRepository alarmRepository;
     private final DynamicAlarmService dynamicAlarmService;
-    private final MqttAlarmPublisher mqttAlarmPublisher;
+    /** lambda 프로파일에서는 MqttAlarmPublisher 빈이 없음 → Optional. */
+    private final Optional<MqttAlarmPublisher> mqttAlarmPublisher;
 
     /**
      * 미보유 요일 알람 행을 채운 뒤 동적 알람을 재계산하고, 전체 목록과 오늘의 유효 기상 시각을 반환한다.
@@ -88,7 +90,7 @@ public class AlarmService {
         boolean willRecalculateToday =
                 Boolean.TRUE.equals(request.getRecomputeDynamicNow()) && alarm.getDayOfWeek() == todayDow;
         if (!willRecalculateToday && alarm.getDayOfWeek() == todayDow) {
-            mqttAlarmPublisher.publishWakeSchedule(userId, alarm.getDynamicWakeAt());
+            mqttAlarmPublisher.ifPresent(pub -> pub.publishWakeSchedule(userId, alarm.getDynamicWakeAt()));
         }
 
         if (Boolean.TRUE.equals(request.getRecomputeDynamicNow()) && alarm.getDayOfWeek() == todayDow) {

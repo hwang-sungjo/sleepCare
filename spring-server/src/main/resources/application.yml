@@ -188,6 +188,7 @@ spring:
       idle-timeout: 30000
       connection-timeout: 5000
       connection-init-sql: SET time_zone = '+09:00'
+      initialization-fail-timeout: -1
 
   # schema.sql / data.sql 자동 실행 차단 (이미 RDS 에 적용됨)
   sql:
@@ -197,4 +198,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        # 부팅 시 DB 연결 없이 dialect 결정 → cold start 단축
+        temp:
+          use_jdbc_metadata_defaults: false
 
