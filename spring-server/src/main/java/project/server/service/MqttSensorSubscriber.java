@@ -15,6 +15,7 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import project.server.dao.RealtimeMetricRepository;
@@ -54,6 +55,7 @@ import java.util.Optional;
  * </p>
  */
 @Slf4j
+@Profile("!lambda")
 @Service
 @RequiredArgsConstructor
 public class MqttSensorSubscriber {

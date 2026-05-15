@@ -20,6 +20,13 @@ out/
 .cursorrules
 docs/
 
+# Claude Code (local-only memory, plans, manuals)
+.claude/
+.claude.json
+.claude.local.json
+CLAUDE.md
+CLAUDE.local.md
+
 # Gradle and Build Output
 .gradle/
 build/

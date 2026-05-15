@@ -5,6 +5,7 @@ spring:
       "local-h2": "devPort, secret, web-mvc, local-h2-db"
       "dev": "devDB, devPort, secret, web-mvc"
       "prod": "prodDB, prodPort, secret, web-mvc"
+      "lambda": "prodDB, secret, web-mvc"
 
 ---
 
@@ -171,4 +172,29 @@ app:
       # 라즈베리가 구독해 다음 기상 순간(JSON wakeAt, UTC ISO)으로 울림 시각 동기화
       schedule-topic: ${MQTT_ALARM_SCHEDULE_TOPIC:iot/alarm/schedule}
       publish-schedule-to-raspberry: ${MQTT_PUBLISH_SCHEDULE_TO_RASPBERRY:true}
+
+---
+
+spring:
+  config:
+    activate:
+      on-profile: "lambda"
+
+  # Lambda 는 매 cold start 마다 새 컨테이너일 수 있으므로 connection pool 작게
+  datasource:
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
+      idle-timeout: 30000
+      connection-timeout: 5000
+      connection-init-sql: SET time_zone = '+09:00'
+
+  # schema.sql / data.sql 자동 실행 차단 (이미 RDS 에 적용됨)
+  sql:
+    init:
+      mode: never
+
+  jpa:
+    hibernate:
+      ddl-auto: none
 

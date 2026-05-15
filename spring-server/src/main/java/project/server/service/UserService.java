@@ -24,6 +24,7 @@ import static project.server.common.response.status.BaseExceptionResponseStatus.
 
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.Optional;
 import java.util.stream.IntStream;
 
 /**
@@ -52,7 +53,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final AlarmRepository alarmRepository;
     private final FitbitRepository fitbitRepository;
-    private final FitbitSyncService fitbitSyncService;
+    private final Optional<FitbitSyncService> fitbitSyncService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -91,7 +92,7 @@ public class UserService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                fitbitSyncService.initialSyncForUser(newUserId);
+                fitbitSyncService.ifPresent(svc -> svc.initialSyncForUser(newUserId));
             }
         });
 
