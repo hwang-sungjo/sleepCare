@@ -1,5 +1,7 @@
 # Security and Environment
 .env
+.env.local
+.env.*.local
 *.pem
 
 # IDE - Visual Studio Code

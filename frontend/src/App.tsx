@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { PageName } from './types';
 import { useNotification } from './hooks/useNotification';
+import { useAuth } from './hooks/useAuth';
+import { authService } from './services/authService';
+import { alarmService, GetAlarmResponse } from './services/alarmService';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import HomePage from './pages/HomePage';
@@ -11,28 +14,81 @@ export default function App() {
     const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
     const [alarmTime, setAlarmTime] = useState('07:30');
+    const [alarmData, setAlarmData] = useState<GetAlarmResponse | null>(null);
     const { notification, showNotification } = useNotification();
+    const auth = useAuth();
 
-    const handleLogin = (e: React.FormEvent) => {
+    // 로그인
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (userId && password) {
+        if (!userId || !password) {
+            showNotification('아이디와 비밀번호를 입력해주세요.');
+            return;
+        }
+        try {
+            const res = await authService.login({ nickname: userId, password });
+            auth.login(res.jwt, res.userId);
+            fetchAlarm(res.jwt);
             setPage('home');
             showNotification('로그인에 성공했습니다.');
-        } else {
-            showNotification('아이디와 비밀번호를 입력해주세요.');
+        } catch (err) {
+            showNotification(err instanceof Error ? err.message : '로그인에 실패했습니다.');
         }
     };
 
-    const handleSignup = (e: React.FormEvent) => {
-        e.preventDefault();
-        showNotification('회원가입이 완료되었습니다.');
-        setPage('login');
+    // 회원가입
+    const handleSignup = async (nickname: string, pw: string) => {
+        try {
+            const res = await authService.signUp({ nickname, password: pw });
+            auth.login(res.jwt, res.userId);
+            fetchAlarm(res.jwt);
+            setPage('home');
+            showNotification('회원가입이 완료되었습니다.');
+        } catch (err) {
+            showNotification(err instanceof Error ? err.message : '회원가입에 실패했습니다.');
+        }
     };
 
-    const handleSetAlarm = (e: React.FormEvent) => {
+    // 알람 조회
+    const fetchAlarm = async (token: string) => {
+        try {
+            const res = await alarmService.getAlarm(token);
+            setAlarmData(res);
+            // 오늘 요일의 baseWakeTime을 기본 alarmTime으로 표시
+            const today = res.alarms.find(a => a.dayOfWeek === res.todayDayOfWeek);
+            if (today) setAlarmTime(today.baseWakeTime);
+        } catch {
+            // 알람 조회 실패 시 기본값 유지
+        }
+    };
+
+    // 알람 설정 저장
+    const handleSetAlarm = async (e: React.FormEvent) => {
         e.preventDefault();
-        showNotification('알람이 성공적으로 설정되었습니다.');
-        setPage('home');
+        if (!auth.token) return;
+        try {
+            const today = new Date().getDay();
+            // JS getDay(): 0=일, 1=월 → ISO: 1=월 ... 7=일 변환
+            const dayOfWeek = today === 0 ? 7 : today;
+            const res = await alarmService.patchAlarm(
+                { dayOfWeek, baseWakeTime: alarmTime },
+                auth.token
+            );
+            setAlarmData(res);
+            setPage('home');
+            showNotification('알람이 성공적으로 설정되었습니다.');
+        } catch (err) {
+            showNotification(err instanceof Error ? err.message : '알람 설정에 실패했습니다.');
+        }
+    };
+
+    // 로그아웃
+    const handleLogout = () => {
+        auth.logout();
+        setUserId('');
+        setPassword('');
+        setAlarmData(null);
+        setPage('login');
     };
 
     switch (page) {
@@ -60,8 +116,10 @@ export default function App() {
             return (
                 <HomePage
                     alarmTime={alarmTime}
+                    alarmData={alarmData}
                     notification={notification}
                     onNavigate={setPage}
+                    onLogout={handleLogout}
                 />
             );
         case 'setAlarm':
