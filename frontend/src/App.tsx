@@ -4,6 +4,8 @@ import { useNotification } from './hooks/useNotification';
 import { useAuth } from './hooks/useAuth';
 import { authService } from './services/authService';
 import { alarmService, GetAlarmResponse } from './services/alarmService';
+import { userService } from './services/userService';
+import { dashboardService, GetSleepDashboardResponse } from './services/dashboardService';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import HomePage from './pages/HomePage';
@@ -15,6 +17,8 @@ export default function App() {
     const [password, setPassword] = useState('');
     const [alarmTime, setAlarmTime] = useState('07:30');
     const [alarmData, setAlarmData] = useState<GetAlarmResponse | null>(null);
+    const [nickname, setNickname] = useState<string>('');
+    const [dashboardData, setDashboardData] = useState<GetSleepDashboardResponse | null>(null);
     const { notification, showNotification } = useNotification();
     const auth = useAuth();
 
@@ -28,7 +32,7 @@ export default function App() {
         try {
             const res = await authService.login({ nickname: userId, password });
             auth.login(res.jwt, res.userId);
-            fetchAlarm(res.jwt);
+            fetchDashboardData(res.jwt);
             setPage('home');
             showNotification('로그인에 성공했습니다.');
         } catch (err) {
@@ -41,7 +45,7 @@ export default function App() {
         try {
             const res = await authService.signUp({ nickname, password: pw });
             auth.login(res.jwt, res.userId);
-            fetchAlarm(res.jwt);
+            fetchDashboardData(res.jwt);
             setPage('home');
             showNotification('회원가입이 완료되었습니다.');
         } catch (err) {
@@ -49,16 +53,25 @@ export default function App() {
         }
     };
 
-    // 알람 조회
-    const fetchAlarm = async (token: string) => {
+    // 통합 데이터 조회 (알람, 사용자, 대시보드)
+    const fetchDashboardData = async (token: string) => {
         try {
-            const res = await alarmService.getAlarm(token);
-            setAlarmData(res);
-            // 오늘 요일의 baseWakeTime을 기본 alarmTime으로 표시
-            const today = res.alarms.find(a => a.dayOfWeek === res.todayDayOfWeek);
-            if (today) setAlarmTime(today.baseWakeTime);
+            const [alarmRes, userRes, dashRes] = await Promise.all([
+                alarmService.getAlarm(token).catch(() => null),
+                userService.getUserProfile(token).catch(() => null),
+                dashboardService.getSleepSummary(token).catch(() => null),
+            ]);
+
+            if (alarmRes) {
+                setAlarmData(alarmRes);
+                // 오늘 요일의 baseWakeTime을 기본 alarmTime으로 표시
+                const today = alarmRes.alarms.find(a => a.dayOfWeek === alarmRes.todayDayOfWeek);
+                if (today) setAlarmTime(today.baseWakeTime);
+            }
+            if (userRes) setNickname(userRes.nickname);
+            if (dashRes) setDashboardData(dashRes);
         } catch {
-            // 알람 조회 실패 시 기본값 유지
+            // 조회 실패 시 기본값 유지
         }
     };
 
@@ -88,6 +101,8 @@ export default function App() {
         setUserId('');
         setPassword('');
         setAlarmData(null);
+        setNickname('');
+        setDashboardData(null);
         setPage('login');
     };
 
@@ -117,6 +132,8 @@ export default function App() {
                 <HomePage
                     alarmTime={alarmTime}
                     alarmData={alarmData}
+                    nickname={nickname || 'DeepSleep'}
+                    dashboardData={dashboardData}
                     notification={notification}
                     onNavigate={setPage}
                     onLogout={handleLogout}
