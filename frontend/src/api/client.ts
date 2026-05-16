@@ -46,7 +46,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
         if (token) headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const API_BASE_URL = import.meta.env.VITE_API_TARGET;
+    const API_BASE_URL = import.meta.env.VITE_API_TARGET || 'http://localhost:9000';
     const url = path.startsWith('http') ? path : `${API_BASE_URL}${path}`;
 
     const res = await fetch(url, {

@@ -15,9 +15,9 @@ spring:
       on-profile: "localDB"
 
   datasource:
-    url: ${DATASOURCE_URL_LOCAL}
-    username: ${DATASOURCE_USERNAME_LOCAL}
-    password: ${DATASOURCE_PASSWORD_LOCAL}
+    url: ${DATASOURCE_URL_LOCAL:jdbc:mysql://localhost:3306/sleepcare?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${DATASOURCE_USERNAME_LOCAL:root}
+    password: ${DATASOURCE_PASSWORD_LOCAL:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       connection-init-sql: SET time_zone = '+09:00'
@@ -78,10 +78,10 @@ spring:
       on-profile: "local-h2-db"
 
   datasource:
-    url: jdbc:h2:file:./data/sleepcare;DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    url: jdbc:h2:mem:sleepcare;DB_CLOSE_DELAY=-1;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
     driver-class-name: org.h2.Driver
-    username: ${DATASOURCE_USERNAME_LOCAL}
-    password: ${DATASOURCE_PASSWORD_LOCAL}
+    username: sa
+    password: password
   h2:
     console:
       enabled: true
@@ -123,8 +123,8 @@ spring:
       on-profile: "secret"
 
 secret:
-  jwt-secret-key: ${JWT_SECRET_KEY}
-  jwt-expired-in: ${JWT_EXPIRED_IN}
+  jwt-secret-key: ${JWT_SECRET_KEY:my_default_secret_key_which_is_at_least_32_bytes_long_12345}
+  jwt-expired-in: ${JWT_EXPIRED_IN:86400000}
 
 ---
 
