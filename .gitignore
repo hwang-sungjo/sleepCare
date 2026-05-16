@@ -1,5 +1,7 @@
 # Security and Environment
 .env
+.env.local
+.env.*.local
 *.pem
 
 # H2 file DB (bootRun workingDir = repo root)

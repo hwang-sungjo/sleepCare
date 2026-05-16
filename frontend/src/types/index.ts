@@ -18,8 +18,6 @@ export interface InputFieldProps {
     value?: string;
     onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
     icon?: LucideIcon;
-    hint?: string;
-    hintType?: 'info' | 'error' | 'success';
 }
 
 export interface AlarmCardProps {
