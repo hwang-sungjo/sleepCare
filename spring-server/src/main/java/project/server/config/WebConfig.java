@@ -35,7 +35,8 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns(
                         "/alarms/**",
                         "/dashboard/**",
-                        "/users/me/**");
+                        "/users/me/**",
+                        "/chat/**");
     }
 
     @Override

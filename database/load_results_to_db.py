@@ -18,6 +18,9 @@ Shared:
 
 - ``DATASOURCE_DB_NAME``: Always used as the SQLAlchemy database name (path segment in JDBC URL is ignored).
 
+By default this script loads every CSV under ``database/results/`` **except** ``user.csv``.
+Pass ``--include-user`` to load ``user`` as well (or list ``user`` in ``--tables``).
+
 The JDBC URL must be a full MySQL URL starting with ``jdbc:mysql://`` (for example
 ``jdbc:mysql://host:3306/dbname``). Placeholders like ``${DATASOURCE_DB_NAME}`` in the URL are expanded from ``os.environ`` after ``.env`` is loaded.
 
@@ -29,6 +32,9 @@ Examples::
 
     python database/load_results_to_db.py
     python database/load_results_to_db.py --profile prod
+    python database/load_results_to_db.py --include-user
+    python database/load_results_to_db.py --tables alarm
+    python database/load_results_to_db.py --tables alarm --include-user
     python database/load_results_to_db.py --tables user alarm
 """
 
@@ -323,8 +329,13 @@ def _parse_args() -> argparse.Namespace:
         metavar="TABLE",
         help=(
             "Tables to load (CSV stem names). "
-            "Repeatable via multiple tokens; omit to load all known tables."
+            "Omit to load every known table except ``user`` (see ``--include-user``)."
         ),
+    )
+    parser.add_argument(
+        "--include-user",
+        action="store_true",
+        help="Also load ``user.csv`` (unioned with ``--tables`` when both are used).",
     )
     parser.add_argument(
         "--env-file",
@@ -359,7 +370,11 @@ def main() -> None:
         if not selected:
             raise ValueError("``--tables`` was passed but no valid names were given.")
     else:
-        selected = frozenset(_ALLOWED_TABLES)
+        # ``user`` is skipped by default (often already populated); use ``--include-user`` to load it.
+        selected = frozenset(_ALLOWED_TABLES) - {"user"}
+
+    if args.include_user:
+        selected = selected | {"user"}
 
     tables = _ordered_selected_tables(selected)
 

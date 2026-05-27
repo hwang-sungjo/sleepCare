@@ -26,20 +26,24 @@ public class DashboardService {
 
     private final DailyHealthSummaryRepository summaryRepository;
     private final RealtimeMetricRepository realtimeMetricRepository;
+    private final DashboardAiAdviceService dashboardAiAdviceService;
 
     /**
-     * {@link #findLatestSummary(long)} 결과로 표시 가능한 두 수치와, 최근 IoT 지표 요약 문자열을 돌려준다.
+     * {@link #findLatestSummary(long)} 결과로 표시 가능한 두 수치, 최근 IoT 지표 요약 문자열,
+     * 그리고 Bedrock 가 생성한 AI 조언 텍스트(실패 시 생략)를 함께 돌려준다.
      */
     public GetSleepDashboardResponse dashboard(long userId) {
         Optional<DailyHealthSummary> latest = findLatestSummary(userId);
         int efficiency = latest.map(DailyHealthSummary::getEfficiency).orElse(0);
         int avgMinutes = latest.map(DailyHealthSummary::getMinutesAsleep).orElse(0);
         String hint = environmentHint(userId);
+        String advice = dashboardAiAdviceService.advise(userId).orElse(null);
 
         return GetSleepDashboardResponse.builder()
                 .sleepEfficiencyPercent(efficiency)
                 .averageSleepDurationMinutes(avgMinutes)
                 .environmentHint(hint)
+                .aiAdvice(advice)
                 .build();
     }
 
