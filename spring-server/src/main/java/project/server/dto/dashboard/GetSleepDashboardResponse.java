@@ -6,6 +6,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
+import project.server.dto.ai.CitationItem;
+
+import java.util.List;
+
 @Getter
 @Builder
 @AllArgsConstructor
@@ -28,4 +32,8 @@ public class GetSleepDashboardResponse {
             nullable = true)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String aiAdvice;
+
+    @Schema(description = "aiAdvice 생성 시 사용된 KB 인용(챗봇 citations 와 동일 구조). 없거나 실패 시 생략.")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<CitationItem> citations;
 }

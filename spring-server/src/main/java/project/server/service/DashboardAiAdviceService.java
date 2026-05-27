@@ -6,8 +6,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import project.server.dto.ai.CitationItem;
+
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateResponse;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -24,6 +27,12 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DashboardAiAdviceService {
 
+    /**
+     * 대시보드 Bedrock 응답 본문과 KB 인용 목록.
+     */
+    public record AiAdviceResult(String text, List<CitationItem> citations) {
+    }
+
     private final S3PromptService s3PromptService;
     private final UserMetricsSummaryService userMetricsSummaryService;
     private final BedrockKnowledgeBaseService bedrockKnowledgeBaseService;
@@ -32,10 +41,10 @@ public class DashboardAiAdviceService {
     private String promptKey;
 
     /**
-     * 사용자 메트릭에 근거한 AI 조언 텍스트.
+     * 사용자 메트릭에 근거한 AI 조언 텍스트 및 KB 인용.
      * Bedrock/S3 호출 실패는 모두 흡수하고 {@link Optional#empty()} 를 반환.
      */
-    public Optional<String> advise(long userId) {
+    public Optional<AiAdviceResult> advise(long userId) {
         try {
             String systemPrompt = s3PromptService.getPrompt(promptKey);
             String userContext = userMetricsSummaryService.buildContext(userId);
@@ -49,7 +58,8 @@ public class DashboardAiAdviceService {
                 log.warn("[DashboardAiAdviceService] empty bedrock response userId={}", userId);
                 return Optional.empty();
             }
-            return Optional.of(text.trim());
+            List<CitationItem> citations = BedrockCitationMapper.fromBedrock(response.citations());
+            return Optional.of(new AiAdviceResult(text.trim(), citations));
         } catch (RuntimeException e) {
             log.warn("[DashboardAiAdviceService] advice generation failed userId={}: {}",
                     userId, e.getMessage());
