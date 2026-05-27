@@ -25,4 +25,20 @@ public class ChatResponse {
     @Schema(description = "답변 근거로 사용된 KB 청크의 출처 정보 (없을 수 있음)")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<CitationItem> citations;
+
+    @Schema(description = "이번 턴에 실행된 DB 스킬 목록 (Converse + tools 경로)")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<ToolCallItem> toolCalls;
+
+    @Getter
+    @Builder
+    @AllArgsConstructor
+    @Schema(description = "실행된 챗봇 DB 스킬 1건")
+    public static class ToolCallItem {
+        @Schema(description = "스킬 operationId", example = "get_daily_sleep_summary")
+        private String skillId;
+
+        @Schema(description = "실행 결과", example = "ok")
+        private String status;
+    }
 }

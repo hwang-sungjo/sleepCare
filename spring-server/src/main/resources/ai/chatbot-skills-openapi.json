@@ -1,0 +1,264 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SleepCare Chatbot DB Skills",
+    "version": "1.0.0",
+    "description": "Read-only DB skills for the SleepCare chatbot. user_id is always injected from JWT on the server; do not pass user_id in request bodies."
+  },
+  "servers": [
+    {
+      "url": "https://{host}/internal/chatbot/skills",
+      "variables": {
+        "host": {
+          "default": "localhost:9000"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/get_daily_sleep_summary": {
+      "post": {
+        "operationId": "get_daily_sleep_summary",
+        "summary": "일일 수면 요약 조회",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "daily_health_summary row"
+          }
+        }
+      }
+    },
+    "/get_sleep_trend_analysis": {
+      "post": {
+        "operationId": "get_sleep_trend_analysis",
+        "summary": "주간/월간 수면 추세",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DaysRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "daily rows in range"
+          }
+        }
+      }
+    },
+    "/get_sleep_efficiency_ranking": {
+      "post": {
+        "operationId": "get_sleep_efficiency_ranking",
+        "summary": "수면 효율 비교",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "reference, best, and stats rows"
+          }
+        }
+      }
+    },
+    "/match_environment_with_sleep_stages": {
+      "post": {
+        "operationId": "match_environment_with_sleep_stages",
+        "summary": "환경-수면 단계 매칭",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "environment averages and stage breakdown"
+          }
+        }
+      }
+    },
+    "/analyze_light_sensitivity": {
+      "post": {
+        "operationId": "analyze_light_sensitivity",
+        "summary": "조도-기상 민감도",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "illuminance stats and alarm row"
+          }
+        }
+      }
+    },
+    "/get_cardiovascular_metrics": {
+      "post": {
+        "operationId": "get_cardiovascular_metrics",
+        "summary": "심혈관 지표",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "heart_rate and hrv aggregates"
+          }
+        }
+      }
+    },
+    "/check_respiratory_health": {
+      "post": {
+        "operationId": "check_respiratory_health",
+        "summary": "호흡/SpO2",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "summary and spo2 aggregates"
+          }
+        }
+      }
+    },
+    "/track_skin_temperature": {
+      "post": {
+        "operationId": "track_skin_temperature",
+        "summary": "피부 온도 추이",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DaysRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "skin_temp_relative series"
+          }
+        }
+      }
+    },
+    "/evaluate_adaptive_alarm_performance": {
+      "post": {
+        "operationId": "evaluate_adaptive_alarm_performance",
+        "summary": "적응형 알람 점검",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DaysOptionalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "alarm rows per weekday"
+          }
+        }
+      }
+    },
+    "/assess_sleep_regularity": {
+      "post": {
+        "operationId": "assess_sleep_regularity",
+        "summary": "수면 규칙성",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DaysRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "start_time/end_time series"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RecordDateRequest": {
+        "type": "object",
+        "required": ["record_date"],
+        "properties": {
+          "record_date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-05-27"
+          }
+        }
+      },
+      "DaysRequest": {
+        "type": "object",
+        "required": ["days"],
+        "properties": {
+          "days": {
+            "type": "integer",
+            "enum": [7, 30]
+          }
+        }
+      },
+      "DaysOptionalRequest": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "enum": [7, 30],
+            "default": 7
+          }
+        }
+      }
+    }
+  }
+}

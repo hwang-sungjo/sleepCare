@@ -55,6 +55,7 @@ dependencies {
 	implementation platform('software.amazon.awssdk:bom:2.25.70')
 	implementation 'software.amazon.awssdk:s3'
 	implementation 'software.amazon.awssdk:bedrockagentruntime'
+	implementation 'software.amazon.awssdk:bedrockruntime'
 
 	// ★ Excluded from lambda build to keep jar under the 50 MB console-upload limit
 	if (!isLambda) {

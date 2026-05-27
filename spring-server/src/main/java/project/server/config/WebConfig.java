@@ -36,7 +36,8 @@ public class WebConfig implements WebMvcConfigurer {
                         "/alarms/**",
                         "/dashboard/**",
                         "/users/me/**",
-                        "/chat/**");
+                        "/chat/**",
+                        "/internal/chatbot/**");
     }
 
     @Override

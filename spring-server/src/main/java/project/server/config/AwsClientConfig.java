@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.bedrockagentruntime.BedrockAgentRuntimeClient;
+import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
 import software.amazon.awssdk.services.s3.S3Client;
 
 /**
@@ -33,6 +34,14 @@ public class AwsClientConfig {
     @Bean
     public BedrockAgentRuntimeClient bedrockAgentRuntimeClient(@Value("${app.ai.region}") String region) {
         return BedrockAgentRuntimeClient.builder()
+                .region(Region.of(region))
+                .credentialsProvider(DefaultCredentialsProvider.create())
+                .build();
+    }
+
+    @Bean
+    public BedrockRuntimeClient bedrockRuntimeClient(@Value("${app.ai.region}") String region) {
+        return BedrockRuntimeClient.builder()
                 .region(Region.of(region))
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
