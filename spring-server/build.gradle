@@ -51,6 +51,12 @@ dependencies {
 	// AWS Lambda + API Gateway proxy for Spring Boot 3
 	implementation 'com.amazonaws.serverless:aws-serverless-java-container-springboot3:2.1.3'
 
+	// AWS SDK v2 — Bedrock(KB RAG)/S3(페르소나 프롬프트)
+	implementation platform('software.amazon.awssdk:bom:2.25.70')
+	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:bedrockagentruntime'
+	implementation 'software.amazon.awssdk:bedrockruntime'
+
 	// ★ Excluded from lambda build to keep jar under the 50 MB console-upload limit
 	if (!isLambda) {
 		runtimeOnly 'com.h2database:h2'

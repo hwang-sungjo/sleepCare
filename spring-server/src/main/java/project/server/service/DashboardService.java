@@ -7,12 +7,14 @@ import org.springframework.stereotype.Service;
 
 import project.server.dao.DailyHealthSummaryRepository;
 import project.server.dao.RealtimeMetricRepository;
+import project.server.dto.ai.CitationItem;
 import project.server.dto.dashboard.GetSleepDashboardResponse;
 import project.server.entity.DailyHealthSummary;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.DoubleSummaryStatistics;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -26,20 +28,27 @@ public class DashboardService {
 
     private final DailyHealthSummaryRepository summaryRepository;
     private final RealtimeMetricRepository realtimeMetricRepository;
+    private final DashboardAiAdviceService dashboardAiAdviceService;
 
     /**
-     * {@link #findLatestSummary(long)} 결과로 표시 가능한 두 수치와, 최근 IoT 지표 요약 문자열을 돌려준다.
+     * {@link #findLatestSummary(long)} 결과로 표시 가능한 두 수치, 최근 IoT 지표 요약 문자열,
+     * 그리고 Bedrock 가 생성한 AI 조언 텍스트·KB 인용(실패 시 생략)을 함께 돌려준다.
      */
     public GetSleepDashboardResponse dashboard(long userId) {
         Optional<DailyHealthSummary> latest = findLatestSummary(userId);
         int efficiency = latest.map(DailyHealthSummary::getEfficiency).orElse(0);
         int avgMinutes = latest.map(DailyHealthSummary::getMinutesAsleep).orElse(0);
         String hint = environmentHint(userId);
+        Optional<DashboardAiAdviceService.AiAdviceResult> adviceOpt = dashboardAiAdviceService.advise(userId);
+        String advice = adviceOpt.map(DashboardAiAdviceService.AiAdviceResult::text).orElse(null);
+        List<CitationItem> citations = adviceOpt.map(DashboardAiAdviceService.AiAdviceResult::citations).orElse(null);
 
         return GetSleepDashboardResponse.builder()
                 .sleepEfficiencyPercent(efficiency)
                 .averageSleepDurationMinutes(avgMinutes)
                 .environmentHint(hint)
+                .aiAdvice(advice)
+                .citations(citations)
                 .build();
     }
 

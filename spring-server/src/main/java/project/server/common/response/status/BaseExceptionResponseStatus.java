@@ -39,7 +39,13 @@ public enum BaseExceptionResponseStatus implements ResponseStatus {
     INVALID_USER_VALUE(5000, HttpStatus.BAD_REQUEST.value(), "회원가입 요청에서 잘못된 값이 존재합니다."),
     DUPLICATE_NICKNAME(5002, HttpStatus.BAD_REQUEST.value(), "이미 존재하는 닉네임입니다."),
     USER_NOT_FOUND(5003, HttpStatus.BAD_REQUEST.value(), "존재하지 않는 회원입니다."),
-    PASSWORD_NO_MATCH(5004, HttpStatus.BAD_REQUEST.value(), "비밀번호가 일치하지 않습니다.");
+    PASSWORD_NO_MATCH(5004, HttpStatus.BAD_REQUEST.value(), "비밀번호가 일치하지 않습니다."),
+
+    /**
+     * 6000: AI/Bedrock 오류
+     */
+    AI_PROMPT_LOAD_FAILED(6001, HttpStatus.SERVICE_UNAVAILABLE.value(), "AI 프롬프트를 불러오지 못했습니다."),
+    AI_GENERATION_FAILED(6002, HttpStatus.SERVICE_UNAVAILABLE.value(), "AI 응답 생성에 실패했습니다.");
 
     private final int code;
     private final int status;
