@@ -162,7 +162,7 @@ app:
   fitbit:
     sync-interval-ms: ${FITBIT_SYNC_INTERVAL_MS:900000}
   ai:
-    region: ${AWS_REGION}
+    region: ${AI_AWS_REGION}
     s3-bucket: ${AI_S3_BUCKET}
     prompt-key-dashboard: ${AI_PROMPT_KEY_DASHBOARD:prompts/skill_dashboard.md}
     prompt-key-chatbot: ${AI_PROMPT_KEY_CHATBOT:prompts/skill_chatbot.md}

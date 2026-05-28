@@ -23,7 +23,7 @@ import java.util.Map;
             "AI_S3_BUCKET=dummy",
             "AI_BEDROCK_KB_ID=dummy",
             "AI_BEDROCK_MODEL_ARN=arn:aws:bedrock:ap-northeast-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
-            "AWS_REGION=ap-northeast-2"
+            "AI_AWS_REGION=ap-northeast-2"
         })
 class ChatbotSkillExecutorTest {
 
