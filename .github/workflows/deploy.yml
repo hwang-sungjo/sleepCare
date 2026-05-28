@@ -103,7 +103,9 @@ jobs:
 
       - name: Build Lambda fat jar
         working-directory: ./spring-server
-        run: ./gradlew clean shadowJar -Pprofile=lambda --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew clean shadowJar -Pprofile=lambda --no-daemon
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
