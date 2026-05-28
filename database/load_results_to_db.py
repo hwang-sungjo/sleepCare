@@ -18,8 +18,10 @@ Shared:
 
 - ``DATASOURCE_DB_NAME``: Always used as the SQLAlchemy database name (path segment in JDBC URL is ignored).
 
-By default this script loads every CSV under ``database/results/`` **except** ``user.csv``.
-Pass ``--include-user`` to load ``user`` as well (or list ``user`` in ``--tables``).
+By default this script loads every CSV under ``database/results/`` **except**
+``user.csv``, ``fitbit.csv``, and ``alarm.csv``.
+Pass ``--include-bootstrap`` to load ``user`` + ``fitbit`` + ``alarm`` as a set
+(or list tables explicitly with ``--tables``).
 
 The JDBC URL must be a full MySQL URL starting with ``jdbc:mysql://`` (for example
 ``jdbc:mysql://host:3306/dbname``). Placeholders like ``${DATASOURCE_DB_NAME}`` in the URL are expanded from ``os.environ`` after ``.env`` is loaded.
@@ -32,9 +34,9 @@ Examples::
 
     python database/load_results_to_db.py
     python database/load_results_to_db.py --profile prod
-    python database/load_results_to_db.py --include-user
+    python database/load_results_to_db.py --include-bootstrap
     python database/load_results_to_db.py --tables alarm
-    python database/load_results_to_db.py --tables alarm --include-user
+    python database/load_results_to_db.py --tables alarm --include-bootstrap
     python database/load_results_to_db.py --tables user alarm
 """
 
@@ -77,6 +79,7 @@ _ALLOWED_TABLES = frozenset(_INSERT_ORDER)
 _CHUNK_SIZE = 400
 
 _AUDIT_TIMESTAMP_COLUMNS = frozenset({"created_at", "updated_at"})
+_AUTO_INCREMENT_COLUMNS = frozenset({"id", "realtime_metric_id"})
 
 
 def _validate_identifier(name: str) -> str:
@@ -116,6 +119,9 @@ def _insert_columns_without_all_blank_audits(
     """
     selected: list[str] = []
     for col in columns:
+        # ``id``는 auto_increment를 가정하므로 CSV에 있어도 항상 INSERT에서 제외한다.
+        if col in _AUTO_INCREMENT_COLUMNS:
+            continue
         if col in _AUDIT_TIMESTAMP_COLUMNS and all(_is_blank(row.get(col)) for row in rows):
             continue
         selected.append(col)
@@ -329,13 +335,22 @@ def _parse_args() -> argparse.Namespace:
         metavar="TABLE",
         help=(
             "Tables to load (CSV stem names). "
-            "Omit to load every known table except ``user`` (see ``--include-user``)."
+            "Omit to load every known table except ``user``, ``fitbit``, and ``alarm`` "
+            "(see ``--include-bootstrap``)."
+        ),
+    )
+    parser.add_argument(
+        "--include-bootstrap",
+        action="store_true",
+        help=(
+            "Also load ``user.csv``, ``fitbit.csv``, and ``alarm.csv`` together "
+            "(unioned with ``--tables`` when both are used)."
         ),
     )
     parser.add_argument(
         "--include-user",
         action="store_true",
-        help="Also load ``user.csv`` (unioned with ``--tables`` when both are used).",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--env-file",
@@ -370,11 +385,11 @@ def main() -> None:
         if not selected:
             raise ValueError("``--tables`` was passed but no valid names were given.")
     else:
-        # ``user`` is skipped by default (often already populated); use ``--include-user`` to load it.
-        selected = frozenset(_ALLOWED_TABLES) - {"user"}
+        # Bootstrap tables are skipped by default; use ``--include-bootstrap`` to load them together.
+        selected = frozenset(_ALLOWED_TABLES) - {"user", "fitbit", "alarm"}
 
-    if args.include_user:
-        selected = selected | {"user"}
+    if args.include_bootstrap or args.include_user:
+        selected = selected | {"user", "fitbit", "alarm"}
 
     tables = _ordered_selected_tables(selected)
 
