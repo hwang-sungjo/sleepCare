@@ -1,12 +1,50 @@
-name: Deploy Frontend to AWS S3
+name: Deploy to AWS
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'frontend/**'
+      - 'spring-server/**'
+  workflow_dispatch:
+    inputs:
+      deploy_frontend:
+        description: Deploy frontend to S3
+        type: boolean
+        default: true
+      deploy_backend:
+        description: Deploy backend (Lambda)
+        type: boolean
+        default: true
 
 jobs:
-  build-and-deploy:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Path filter
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'spring-server/**'
+
+  deploy-frontend:
+    name: Deploy frontend (S3)
+    needs: changes
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend) ||
+      (github.event_name == 'push' && needs.changes.outputs.frontend == 'true')
     runs-on: ubuntu-latest
 
     steps:
@@ -43,3 +81,70 @@ jobs:
       - name: Deploy to S3
         run: |
           aws s3 sync ./frontend/dist/ s3://sleepcare-frontend --delete
+
+  deploy-backend:
+    name: Deploy backend (Lambda)
+    needs: changes
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_backend) ||
+      (github.event_name == 'push' && needs.changes.outputs.backend == 'true')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Build Lambda fat jar
+        working-directory: ./spring-server
+        run: ./gradlew clean shadowJar -Pprofile=lambda --no-daemon
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AI_AWS_REGION }}
+
+      - name: Publish jar to Lambda
+        env:
+          FUNCTION_NAME: ${{ secrets.LAMBDA_FUNCTION_NAME }}
+          DEPLOY_BUCKET: ${{ secrets.LAMBDA_DEPLOY_S3_BUCKET }}
+        run: |
+          set -euo pipefail
+          JAR="spring-server/build/libs/server-0.0.1-SNAPSHOT-all.jar"
+          if [ ! -f "$JAR" ]; then
+            echo "Missing artifact: $JAR"
+            exit 1
+          fi
+          if [ -z "${FUNCTION_NAME}" ]; then
+            echo "Set repository secret LAMBDA_FUNCTION_NAME to your Lambda function name."
+            exit 1
+          fi
+
+          if [ -n "${DEPLOY_BUCKET}" ]; then
+            KEY="lambda-deploy/${GITHUB_SHA}/server-all.jar"
+            aws s3 cp "$JAR" "s3://${DEPLOY_BUCKET}/${KEY}"
+            aws lambda update-function-code \
+              --function-name "${FUNCTION_NAME}" \
+              --s3-bucket "${DEPLOY_BUCKET}" \
+              --s3-key "${KEY}"
+          else
+            SIZE_MB=$(( $(stat -c%s "$JAR") / 1024 / 1024 ))
+            if [ "${SIZE_MB}" -ge 50 ]; then
+              echo "Jar is ${SIZE_MB}MB (>= 50MB). Set LAMBDA_DEPLOY_S3_BUCKET secret for S3-based deploy."
+              exit 1
+            fi
+            aws lambda update-function-code \
+              --function-name "${FUNCTION_NAME}" \
+              --zip-file "fileb://${JAR}"
+          fi
+
+          aws lambda wait function-updated --function-name "${FUNCTION_NAME}"
+          echo "Lambda updated: ${FUNCTION_NAME}"

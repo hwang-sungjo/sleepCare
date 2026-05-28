@@ -50,7 +50,7 @@ public class ChatbotSkillExecutor {
 
     public ChatbotSkillResult execute(ChatbotSkillId skillId, long userId, Map<String, Object> toolInput) {
         Map<String, Object> input = toolInput == null ? Map.of() : toolInput;
-        log.info("[ChatbotSkillExecutor] skill={} userId={} params={}", skillId.operationId(), userId, input.keySet());
+        log.info("[ChatbotSkillExecutor] skill={} userId={} params={}", skillId.operationId(), userId, input);
 
         return switch (skillId) {
             case GET_DAILY_SLEEP_SUMMARY -> getDailySleepSummary(userId, input);
