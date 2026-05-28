@@ -29,6 +29,8 @@ import software.amazon.awssdk.services.bedrockruntime.model.ToolResultBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ToolResultContentBlock;
 import software.amazon.awssdk.services.bedrockruntime.model.ToolUseBlock;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,6 +43,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class BedrockConverseService {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final BedrockRuntimeClient bedrockRuntimeClient;
     private final ChatbotSkillExecutor skillExecutor;
@@ -65,6 +69,8 @@ public class BedrockConverseService {
         List<Message> history = conversationStore.history(resolvedSession);
         history.add(userMessage(userMessage));
 
+        String effectiveSystemPrompt = augmentSystemPromptWithKstToday(systemPrompt);
+
         List<ChatResponse.ToolCallItem> toolCalls = new ArrayList<>();
         ToolConfiguration toolConfig = ToolConfiguration.builder()
                 .tools(ChatbotToolSpecFactory.allTools())
@@ -72,7 +78,7 @@ public class BedrockConverseService {
 
         String replyText = null;
         for (int round = 0; round <= maxToolRounds; round++) {
-            ConverseResponse response = invoke(systemPrompt, history, toolConfig);
+            ConverseResponse response = invoke(effectiveSystemPrompt, history, toolConfig);
             Message assistantMessage = response.output().message();
             history.add(assistantMessage);
 
@@ -125,6 +131,25 @@ public class BedrockConverseService {
             replyText = "요청을 처리했지만 최종 답변을 생성하지 못했습니다. 다시 질문해 주세요.";
         }
         return new ConverseChatResult(replyText.trim(), resolvedSession, toolCalls.isEmpty() ? null : toolCalls);
+    }
+
+    /**
+     * 모델이 record_date 등을 임의 연도(학습 데이터)로 채우지 않도록 KST 오늘 날짜를 system 에 붙인다.
+     */
+    static String augmentSystemPromptWithKstToday(String systemPrompt) {
+        LocalDate today = LocalDate.now(KST);
+        String dateBlock =
+                """
+
+                [시스템 시각] Asia/Seoul(KST) 기준 오늘 날짜: %s.
+                record_date 등 날짜 파라미터는 반드시 이 날짜를 기준으로 계산한다 (어제 = 오늘에서 1일 전).
+                학습 데이터나 임의의 과거 연도 날짜를 사용하지 않는다.
+                """
+                        .formatted(today);
+        if (systemPrompt == null || systemPrompt.isBlank()) {
+            return dateBlock.stripLeading();
+        }
+        return systemPrompt + dateBlock;
     }
 
     private ConverseResponse invoke(String systemPrompt, List<Message> messages, ToolConfiguration toolConfig) {
