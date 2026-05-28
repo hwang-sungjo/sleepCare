@@ -4,10 +4,47 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'frontend/**'
+      - 'spring-server/**'
+  workflow_dispatch:
+    inputs:
+      deploy_frontend:
+        description: Deploy frontend to S3
+        type: boolean
+        default: true
+      deploy_backend:
+        description: Deploy backend (Lambda)
+        type: boolean
+        default: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Path filter
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'spring-server/**'
+
   deploy-frontend:
     name: Deploy frontend (S3)
+    needs: changes
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_frontend) ||
+      (github.event_name == 'push' && needs.changes.outputs.frontend == 'true')
     runs-on: ubuntu-latest
 
     steps:
@@ -47,6 +84,10 @@ jobs:
 
   deploy-backend:
     name: Deploy backend (Lambda)
+    needs: changes
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_backend) ||
+      (github.event_name == 'push' && needs.changes.outputs.backend == 'true')
     runs-on: ubuntu-latest
 
     steps:
