@@ -171,7 +171,6 @@ app:
       knowledge-base-id: ${AI_BEDROCK_KB_ID}
       model-arn: ${AI_BEDROCK_MODEL_ARN}
     chatbot:
-      use-tools: ${AI_CHATBOT_USE_TOOLS:true}
       max-tool-rounds: ${AI_CHATBOT_MAX_TOOL_ROUNDS:5}
       converse-model-arn: ${AI_CHATBOT_CONVERSE_MODEL_ARN:${AI_BEDROCK_MODEL_ARN}}
   mqtt:

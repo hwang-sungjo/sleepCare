@@ -7,12 +7,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import software.amazon.awssdk.services.bedrockagentruntime.BedrockAgentRuntimeClient;
+import project.server.dto.ai.CitationItem;
+
+import software.amazon.awssdk.services.bedrockagentruntime.model.KnowledgeBaseQuery;
+import software.amazon.awssdk.services.bedrockagentruntime.model.KnowledgeBaseRetrievalResult;
 import software.amazon.awssdk.services.bedrockagentruntime.model.KnowledgeBaseRetrieveAndGenerateConfiguration;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateConfiguration;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateInput;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateRequest;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateResponse;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGenerateType;
+import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveRequest;
+import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveResponse;
+
+import java.util.List;
 
 /**
  * Bedrock Knowledge Base RAG (RetrieveAndGenerate) 호출 래퍼.
@@ -28,6 +36,9 @@ import software.amazon.awssdk.services.bedrockagentruntime.model.RetrieveAndGene
 @Service
 @RequiredArgsConstructor
 public class BedrockKnowledgeBaseService {
+
+    private static final int MAX_RETRIEVAL_RESULTS = 5;
+    private static final int MAX_SNIPPET_CHARS = 900;
 
     private final BedrockAgentRuntimeClient bedrockClient;
 
@@ -72,6 +83,67 @@ public class BedrockKnowledgeBaseService {
         log.debug("[BedrockKnowledgeBaseService] invoke kb={} sessionId={} inputLen={}",
                 knowledgeBaseId, sessionId, composed.length());
         return bedrockClient.retrieveAndGenerate(builder.build());
+    }
+
+    /**
+     * KB 에서 논문 청크만 검색한다 (생성 없음). Converse+스킬 경로에서 컨텍스트·citations 용.
+     */
+    public KnowledgeBaseRetrieveResult retrieveContext(String query) {
+        if (knowledgeBaseId == null || knowledgeBaseId.isBlank()) {
+            log.warn("[BedrockKnowledgeBaseService] knowledge-base-id not configured; skip retrieve");
+            return KnowledgeBaseRetrieveResult.empty();
+        }
+        if (query == null || query.isBlank()) {
+            return KnowledgeBaseRetrieveResult.empty();
+        }
+
+        RetrieveResponse response = bedrockClient.retrieve(RetrieveRequest.builder()
+                .knowledgeBaseId(knowledgeBaseId)
+                .retrievalQuery(KnowledgeBaseQuery.builder().text(query.trim()).build())
+                .build());
+
+        List<KnowledgeBaseRetrievalResult> results = response.retrievalResults();
+        if (results == null || results.isEmpty()) {
+            return KnowledgeBaseRetrieveResult.empty();
+        }
+
+        int limit = Math.min(results.size(), MAX_RETRIEVAL_RESULTS);
+        List<KnowledgeBaseRetrievalResult> trimmed = results.subList(0, limit);
+        List<CitationItem> citations = BedrockCitationMapper.fromRetrievalResults(trimmed);
+        String contextForPrompt = formatContextBlock(trimmed);
+        return new KnowledgeBaseRetrieveResult(citations, contextForPrompt);
+    }
+
+    private static String formatContextBlock(List<KnowledgeBaseRetrievalResult> results) {
+        StringBuilder sb = new StringBuilder();
+        int index = 1;
+        for (KnowledgeBaseRetrievalResult result : results) {
+            String snippet = result.content() == null ? null : result.content().text();
+            if (snippet == null || snippet.isBlank()) {
+                continue;
+            }
+            String trimmed = snippet.strip();
+            if (trimmed.length() > MAX_SNIPPET_CHARS) {
+                trimmed = trimmed.substring(0, MAX_SNIPPET_CHARS) + "…";
+            }
+            String location = retrievalLocationUri(result);
+            if (sb.length() > 0) {
+                sb.append("\n\n");
+            }
+            sb.append("[").append(index++).append("] ");
+            if (location != null && !location.isBlank()) {
+                sb.append("출처: ").append(location).append("\n");
+            }
+            sb.append(trimmed);
+        }
+        return sb.toString();
+    }
+
+    private static String retrievalLocationUri(KnowledgeBaseRetrievalResult result) {
+        if (result.location() == null || result.location().s3Location() == null) {
+            return null;
+        }
+        return result.location().s3Location().uri();
     }
 
     private static String composeInput(String systemPrompt, String userText) {

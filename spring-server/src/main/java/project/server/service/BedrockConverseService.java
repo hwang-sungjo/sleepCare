@@ -60,7 +60,8 @@ public class BedrockConverseService {
     public record ConverseChatResult(String reply, String sessionId, List<ChatResponse.ToolCallItem> toolCalls) {
     }
 
-    public ConverseChatResult chat(long userId, String userMessage, String systemPrompt, String sessionId) {
+    public ConverseChatResult chat(
+            long userId, String userMessage, String systemPrompt, String knowledgeBaseContext, String sessionId) {
         if (converseModelArn == null || converseModelArn.isBlank()) {
             throw new IllegalStateException("app.ai.chatbot.converse-model-arn (or app.ai.bedrock.model-arn) is not configured");
         }
@@ -69,7 +70,7 @@ public class BedrockConverseService {
         List<Message> history = conversationStore.history(resolvedSession);
         history.add(userMessage(userMessage));
 
-        String effectiveSystemPrompt = augmentSystemPromptWithKstToday(systemPrompt);
+        String effectiveSystemPrompt = augmentSystemPromptWithKstToday(systemPrompt, knowledgeBaseContext);
 
         List<ChatResponse.ToolCallItem> toolCalls = new ArrayList<>();
         ToolConfiguration toolConfig = ToolConfiguration.builder()
@@ -134,9 +135,9 @@ public class BedrockConverseService {
     }
 
     /**
-     * 모델이 record_date 등을 임의 연도(학습 데이터)로 채우지 않도록 KST 오늘 날짜를 system 에 붙인다.
+     * KST 오늘 날짜·KB 검색 청크를 system prompt 에 붙인다.
      */
-    static String augmentSystemPromptWithKstToday(String systemPrompt) {
+    static String augmentSystemPromptWithKstToday(String systemPrompt, String knowledgeBaseContext) {
         LocalDate today = LocalDate.now(KST);
         String dateBlock =
                 """
@@ -146,10 +147,23 @@ public class BedrockConverseService {
                 학습 데이터나 임의의 과거 연도 날짜를 사용하지 않는다.
                 """
                         .formatted(today);
-        if (systemPrompt == null || systemPrompt.isBlank()) {
-            return dateBlock.stripLeading();
+        String merged = systemPrompt == null || systemPrompt.isBlank()
+                ? dateBlock.stripLeading()
+                : systemPrompt + dateBlock;
+        return appendKnowledgeBaseContext(merged, knowledgeBaseContext);
+    }
+
+    static String appendKnowledgeBaseContext(String systemPrompt, String knowledgeBaseContext) {
+        if (knowledgeBaseContext == null || knowledgeBaseContext.isBlank()) {
+            return systemPrompt;
         }
-        return systemPrompt + dateBlock;
+        return systemPrompt
+                + """
+
+                [Knowledge Base — 수면 관련 논문/가이드 발췌]
+                개인 수치·알람·일별 기록은 반드시 DB tool 로 조회한다. 아래 발췌는 일반 근거·설명용이다.
+                """
+                + knowledgeBaseContext;
     }
 
     private ConverseResponse invoke(String systemPrompt, List<Message> messages, ToolConfiguration toolConfig) {

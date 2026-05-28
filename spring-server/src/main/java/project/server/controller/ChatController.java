@@ -34,7 +34,7 @@ import static project.server.util.BindingResultUtils.getErrorMessages;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/chat")
-@Tag(name = "Chat", description = "AI 챗봇 API (기본: Converse+DB 스킬, use-tools=false 시 KB RAG)")
+@Tag(name = "Chat", description = "AI 챗봇 API (KB 검색 + Converse + DB 스킬)")
 public class ChatController {
 
     private final ChatbotService chatbotService;

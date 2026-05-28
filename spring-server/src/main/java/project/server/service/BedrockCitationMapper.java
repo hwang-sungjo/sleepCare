@@ -3,6 +3,7 @@ package project.server.service;
 import project.server.dto.ai.CitationItem;
 
 import software.amazon.awssdk.services.bedrockagentruntime.model.Citation;
+import software.amazon.awssdk.services.bedrockagentruntime.model.KnowledgeBaseRetrievalResult;
 import software.amazon.awssdk.services.bedrockagentruntime.model.RetrievedReference;
 
 import java.util.ArrayList;
@@ -42,6 +43,38 @@ public final class BedrockCitationMapper {
             }
         }
         return out.isEmpty() ? null : out;
+    }
+
+    /**
+     * {@code Retrieve} API 의 검색 결과를 인용 DTO 로 변환한다.
+     */
+    public static List<CitationItem> fromRetrievalResults(List<KnowledgeBaseRetrievalResult> results) {
+        if (results == null || results.isEmpty()) {
+            return null;
+        }
+        List<CitationItem> out = new ArrayList<>();
+        for (KnowledgeBaseRetrievalResult result : results) {
+            String location = extractRetrievalLocation(result);
+            String snippet = result.content() == null ? null : result.content().text();
+            if (location == null && snippet == null) {
+                continue;
+            }
+            out.add(CitationItem.builder()
+                    .location(location)
+                    .snippet(snippet)
+                    .build());
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    private static String extractRetrievalLocation(KnowledgeBaseRetrievalResult result) {
+        if (result.location() == null) {
+            return null;
+        }
+        if (result.location().s3Location() != null && result.location().s3Location().uri() != null) {
+            return result.location().s3Location().uri();
+        }
+        return result.location().typeAsString();
     }
 
     private static String extractLocation(RetrievedReference ref) {

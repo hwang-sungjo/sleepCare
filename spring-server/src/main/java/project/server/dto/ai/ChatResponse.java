@@ -22,7 +22,7 @@ public class ChatResponse {
             example = "9c1f0c1a-aa57-4ce4-a8cf-1b9d5b6a59e2")
     private String sessionId;
 
-    @Schema(description = "답변 근거로 사용된 KB 청크의 출처 정보 (없을 수 있음)")
+    @Schema(description = "KB 논문 검색 인용 (Converse+스킬 경로에서도 Retrieve 결과, 없을 수 있음)")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<CitationItem> citations;
 
