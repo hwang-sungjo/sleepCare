@@ -28,25 +28,17 @@ public class AuthService {
 
         String nickname = authRequest.getNickname();
 
-        long userId = userRepository
+        UserEntity user = userRepository
                 .findByNickname(nickname)
-                .map(UserEntity::getUserId)
                 .orElseThrow(() -> new UserException(USER_NOT_FOUND));
 
-        validatePassword(authRequest.getPassword(), userId);
-
-        String updatedJwt = jwtTokenProvider.createToken(nickname, userId);
-
-        return new LoginResponse(userId, updatedJwt);
-    }
-
-    private void validatePassword(String password, long userId) {
-        String encodedPassword = userRepository.findById(userId)
-                .orElseThrow(() -> new UserException(USER_NOT_FOUND))
-                .getPassword();
-        if (!passwordEncoder.matches(password, encodedPassword)) {
+        if (!passwordEncoder.matches(authRequest.getPassword(), user.getPassword())) {
             throw new UserException(PASSWORD_NO_MATCH);
         }
+
+        String updatedJwt = jwtTokenProvider.createToken(nickname, user.getUserId());
+
+        return new LoginResponse(user.getUserId(), updatedJwt);
     }
 
 }

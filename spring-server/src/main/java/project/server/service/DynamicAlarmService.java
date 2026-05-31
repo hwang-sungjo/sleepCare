@@ -68,7 +68,7 @@ public class DynamicAlarmService {
      * true 이면 적응형 단계까지 계산해 본 {@code chosenAt} 를 버리고
      * 반드시 windowStart 로 저장한다 (데모 목적).
      */
-    private static final boolean DEMO_FORCE_DYNAMIC_EQUALS_WINDOW_START = true;
+    private static final boolean DEMO_FORCE_DYNAMIC_EQUALS_WINDOW_START = false;
 
     private final AlarmRepository alarmRepository;
     private final SleepStageRepository sleepStageRepository;
@@ -105,10 +105,14 @@ public class DynamicAlarmService {
             return;
         }
 
-        // ⑤ 수면 단계 목록(KST 오늘, 시작 시각 오름차순).
+        // ⑤ 수면 단계 목록.
+        // Fitbit은 수면 시작일(취침일)을 record_date로 기록 → 아침 알람 기준 데이터는 어제 날짜에 저장됨.
         LocalDate today = LocalDate.now(DEFAULT_ZONE);
         List<SleepStage> stages =
-                sleepStageRepository.findByUserIdAndRecordDateOrderByStartTimeAsc(userId, today);
+                sleepStageRepository.findByUserIdAndRecordDateOrderByStartTimeAsc(userId, today.minusDays(1));
+        if (stages.isEmpty()) {
+            stages = sleepStageRepository.findByUserIdAndRecordDateOrderByStartTimeAsc(userId, today);
+        }
 
         // ⑥~⑦: 얕은 구간 후보 순간 후, now 이후만 남겨 최소 선택. 부재 시 windowEnd.
         LocalDateTime chosenAt = stages.stream()
