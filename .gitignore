@@ -20,7 +20,8 @@ out/
 # IDE - Cursor
 .cursor/
 .cursorrules
-docs/
+docs/*
+!docs/ALARM_ALGORITHM.md
 
 # Claude Code (local-only memory, plans, manuals)
 .claude/
