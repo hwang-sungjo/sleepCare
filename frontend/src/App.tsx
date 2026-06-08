@@ -10,6 +10,9 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import HomePage from './pages/HomePage';
 import SetAlarmPage from './pages/SetAlarmPage';
+import SleepEfficiencyDetailPage from './pages/SleepEfficiencyDetailPage';
+import SleepDurationDetailPage from './pages/SleepDurationDetailPage';
+import ChatbotPage from './pages/ChatbotPage';
 
 export default function App() {
     const [page, setPage] = useState<PageName>('login');
@@ -147,6 +150,27 @@ export default function App() {
                     onAlarmTimeChange={setAlarmTime}
                     onSave={handleSetAlarm}
                     onBack={() => setPage('home')}
+                />
+            );
+        case 'sleepEfficiencyDetail':
+            return (
+                <SleepEfficiencyDetailPage
+                    onBack={() => setPage('home')}
+                    onNavigate={setPage}
+                />
+            );
+        case 'sleepDurationDetail':
+            return (
+                <SleepDurationDetailPage
+                    onBack={() => setPage('home')}
+                    onNavigate={setPage}
+                />
+            );
+        case 'chatbot':
+            return (
+                <ChatbotPage
+                    onBack={() => setPage('home')}
+                    onNavigate={setPage}
                 />
             );
         default:
