@@ -9,7 +9,7 @@ const repoRoot = path.resolve(__dirname, '..')
 const springServer = path.join(repoRoot, 'spring-server')
 const isWin = process.platform === 'win32'
 const gradle = isWin ? 'gradlew.bat' : './gradlew'
-const profile = process.env.SPRING_PROFILE || 'local-h2'
+const profile = process.env.SPRING_PROFILE || 'local'
 
 const child = spawn(gradle, ['bootRun', `-Pprofile=${profile}`], {
   cwd: springServer,

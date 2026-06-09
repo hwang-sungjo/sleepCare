@@ -25,7 +25,7 @@ npm run dev
 
 ```bash
 npm run dev:backend    # spring-server Gradle bootRun (프로파일: SPRING_PROFILE 또는 기본 local-h2)
-npm run dev:frontend   # Vite — 루트 `.env` 의 VITE_API_TARGET 사용
+npm run dev:frontend   # Vite — `frontend/.env` 의 VITE_API_BASE_URL 사용
 ```
 
 루트에서 Gradle을 직접 쓰고 싶다면(선택):
@@ -51,7 +51,7 @@ node scripts/run-gradle.cjs build
 
 백엔드와 프론트가 **저장소 루트**의 `.env`를 공유합니다. 템플릿은 `.env.sample`을 복사해 `.env`를 만든 뒤 값을 채우면 됩니다.
 
-- `VITE_API_TARGET`: Vite 프록시가 `/api`를 넘길 백엔드 베이스 URL (기본 `http://localhost:9000`)
+- `VITE_API_BASE_URL`: 백엔드 베이스 URL (로컬 기본 `http://localhost:9000`) — `frontend/.env`에 설정
 - DB·JWT 등은 `spring-server`의 `application.yml`이 참조하는 변수명과 동일하게 설정합니다.
 
 값을 바꾼 뒤에는 해당 프로세스를 재시작하면 됩니다.
