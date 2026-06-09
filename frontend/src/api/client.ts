@@ -1,4 +1,4 @@
-const TOKEN_KEY = 'sleepCare.token';
+const TOKEN_KEY = 'sleepcare_jwt';
 
 export function getToken(): string | null {
     return localStorage.getItem(TOKEN_KEY);

@@ -5,6 +5,7 @@ import { GetAlarmResponse } from '../services/alarmService';
 import { GetSleepDashboardResponse } from '../services/dashboardService';
 import PageWrapper from '../layouts/PageWrapper';
 import AlarmCard from '../components/AlarmCard';
+import CitationList from '../components/CitationList';
 
 interface HomePageProps {
     alarmTime: string;
@@ -74,8 +75,11 @@ const HomePage: React.FC<HomePageProps> = ({ alarmTime, alarmData, nickname, das
                     수면 가이드
                 </h4>
                 <p className="text-sm text-indigo-200/80 leading-relaxed">
-                    {dashboardData?.environmentHint || '오늘의 수면 가이드를 준비 중입니다.'}
+                    {dashboardData?.aiAdvice || '오늘의 수면 가이드를 준비 중입니다.'}
                 </p>
+                {dashboardData?.citations && dashboardData.citations.length > 0 && (
+                    <CitationList citations={dashboardData.citations} variant="compact" />
+                )}
             </div>
 
             {/* 챗봇 진입 버튼 */}

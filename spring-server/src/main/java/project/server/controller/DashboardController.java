@@ -16,6 +16,7 @@ import project.server.common.argument_resolver.PreAuthorize;
 import project.server.common.response.BaseErrorResponse;
 import project.server.common.response.BaseResponse;
 import project.server.dto.dashboard.GetSleepDashboardResponse;
+import project.server.dto.dashboard.GetWeeklySleepHistoryResponse;
 import project.server.service.DashboardService;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -64,5 +65,39 @@ public class DashboardController {
             @Parameter(hidden = true) @PreAuthorize long userId) {
         log.info("[DashboardController.summary] user={}", userId);
         return new BaseResponse<>(dashboardService.dashboard(userId));
+    }
+
+    @Operation(
+            summary = "최근 7일 수면 상세 기록 조회",
+            description =
+                    "KST 기준 오늘을 포함한 최근 7일 구간에서 daily_health_summary 가 존재하는 날의 "
+                            + "수면 효율·시간·수면 단계별 분을 record_date 오름차순으로 반환합니다.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = GetWeeklySleepHistoryResponse.class))),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "JWT 검증 실패",
+                    content = @Content(
+                            schema = @Schema(implementation = BaseErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "TokenNotFound",
+                                    value = """
+                                            {
+                                              "code": 4001,
+                                              "status": 400,
+                                              "message": "토큰이 HTTP Header에 없습니다.",
+                                              "timestamp": "2026-04-28T19:20:15.123"
+                                            }
+                                            """)))
+    })
+    @GetMapping("/sleep-history")
+    public BaseResponse<GetWeeklySleepHistoryResponse> sleepHistory(
+            @Parameter(hidden = true) @PreAuthorize long userId) {
+        log.info("[DashboardController.sleepHistory] user={}", userId);
+        return new BaseResponse<>(dashboardService.weeklySleepHistory(userId));
     }
 }

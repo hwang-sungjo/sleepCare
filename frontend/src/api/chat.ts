@@ -1,9 +1,15 @@
 import { request } from './client';
 
+export interface ToolCallItem {
+    skillId: string;
+    status: string;
+}
+
 export interface ChatMessage {
     role: 'user' | 'assistant';
     text: string;
     citations?: CitationItem[];
+    toolCalls?: ToolCallItem[];
     timestamp: Date;
 }
 
@@ -16,7 +22,7 @@ interface ChatApiResponse {
     reply: string;
     sessionId: string;
     citations?: CitationItem[] | null;
-    toolCalls?: { skillId: string; status: string }[] | null;
+    toolCalls?: ToolCallItem[] | null;
 }
 
 export function sendChatMessage(

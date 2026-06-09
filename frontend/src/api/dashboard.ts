@@ -8,7 +8,6 @@ export interface DashboardCitationItem {
 export interface DashboardResponse {
     sleepEfficiencyPercent: number;
     averageSleepDurationMinutes: number;
-    environmentHint: string;
     aiAdvice?: string | null;
     citations?: DashboardCitationItem[] | null;
 }

@@ -6,6 +6,7 @@ import {
 import { Clock, Moon, Sunrise } from 'lucide-react';
 import { PageName, DailySleepRecord } from '../types';
 import { getWeeklySleepHistory } from '../api/sleepHistory';
+import { useAuth } from '../hooks/useAuth';
 import PageWrapper from '../layouts/PageWrapper';
 
 interface Props {
@@ -38,15 +39,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const SleepDurationDetailPage: React.FC<Props> = ({ onBack, onNavigate }) => {
+    const { token } = useAuth();
     const [records, setRecords] = useState<DailySleepRecord[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getWeeklySleepHistory().then((data) => {
-            setRecords(data);
+        if (!token) {
             setLoading(false);
-        });
-    }, []);
+            return;
+        }
+        getWeeklySleepHistory(token)
+            .then((data) => setRecords(data))
+            .catch(() => setRecords([]))
+            .finally(() => setLoading(false));
+    }, [token]);
 
     const avg =
         records.length > 0

@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { DailySleepRecord } from '../types';
 
 /** Bedrock KB 인용 — 챗봇 `citations` 와 동일 구조 */
 export interface DashboardCitationItem {
@@ -9,12 +10,18 @@ export interface DashboardCitationItem {
 export interface GetSleepDashboardResponse {
     sleepEfficiencyPercent: number | null;
     averageSleepDurationMinutes: number | null;
-    environmentHint: string | null;
     aiAdvice?: string | null;
     citations?: DashboardCitationItem[] | null;
+}
+
+export interface GetWeeklySleepHistoryResponse {
+    records: DailySleepRecord[];
 }
 
 export const dashboardService = {
     getSleepSummary: (token: string) =>
         api.get<GetSleepDashboardResponse>('/dashboard/sleep-summary', token),
+
+    getWeeklySleepHistory: (token: string) =>
+        api.get<GetWeeklySleepHistoryResponse>('/dashboard/sleep-history', token),
 };

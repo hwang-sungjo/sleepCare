@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
+import React from 'react';
 import { ChatMessage } from '../api/chat';
+import { formatToolCallLabel } from '../utils/chatbotSkills';
+import CitationList from './CitationList';
 
 interface Props {
     message: ChatMessage;
 }
 
 const ChatBubble: React.FC<Props> = ({ message }) => {
-    const [citationsOpen, setCitationsOpen] = useState(false);
     const isUser = message.role === 'user';
+    const hasToolCalls = !isUser && message.toolCalls && message.toolCalls.length > 0;
     const hasCitations = !isUser && message.citations && message.citations.length > 0;
 
     return (
@@ -29,37 +30,17 @@ const ChatBubble: React.FC<Props> = ({ message }) => {
                     {message.text}
                 </div>
 
-                {hasCitations && (
-                    <div className="mt-1.5 w-full">
-                        <button
-                            onClick={() => setCitationsOpen((o) => !o)}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors px-1"
-                        >
-                            <BookOpen size={11} />
-                            참고 문헌 {message.citations!.length}건
-                            {citationsOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                        </button>
-                        {citationsOpen && (
-                            <div className="mt-1.5 space-y-1.5">
-                                {message.citations!.map((c, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="bg-slate-900 border border-slate-700/50 rounded-xl px-3 py-2"
-                                    >
-                                        {c.location && (
-                                            <p className="text-indigo-400 text-xs font-medium mb-1 truncate">
-                                                📄 {c.location}
-                                            </p>
-                                        )}
-                                        <p className="text-slate-400 text-xs leading-relaxed line-clamp-3">
-                                            {c.snippet}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                {hasToolCalls && (
+                    <div className="mt-1 px-1 space-y-0.5">
+                        {message.toolCalls!.map((tc, idx) => (
+                            <p key={idx} className="text-xs text-slate-600">
+                                {formatToolCallLabel(tc.skillId, tc.status)}
+                            </p>
+                        ))}
                     </div>
                 )}
+
+                {hasCitations && <CitationList citations={message.citations!} />}
 
                 <p className="text-xs text-slate-600 mt-1 px-1">
                     {message.timestamp.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}

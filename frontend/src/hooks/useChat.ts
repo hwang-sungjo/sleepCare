@@ -25,6 +25,7 @@ export function useChat() {
                 citations: (res.citations ?? []).filter(
                     (c): c is CitationItem => c.snippet != null
                 ),
+                toolCalls: res.toolCalls ?? undefined,
                 timestamp: new Date(),
             };
             setMessages((prev) => [...prev, assistantMsg]);
