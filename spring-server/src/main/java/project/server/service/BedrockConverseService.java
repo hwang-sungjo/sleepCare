@@ -143,10 +143,15 @@ public class BedrockConverseService {
                 """
 
                 [시스템 시각] Asia/Seoul(KST) 기준 오늘 날짜: %s.
-                record_date 등 날짜 파라미터는 반드시 이 날짜를 기준으로 계산한다 (어제 = 오늘에서 1일 전).
-                학습 데이터나 임의의 과거 연도 날짜를 사용하지 않는다.
+
+                [record_date 규칙] daily_health_summary 의 record_date 는 기상일(일어난 날, KST)이다.
+                - 사용자가 "어제 수면", "어젯밤 수면", "지난밤 수면", "오늘 아침에 일어난 수면" 등을 말하면 record_date = 오늘(%s).
+                  (어제 밤에 잠들어 오늘 아침에 기상했다고 가정한다. 달력상 어제 날짜를 쓰지 않는다.)
+                - "그저께 밤", "이틀 전 밤" 등은 기상일을 계산해 record_date 에 넣는다.
+                  예: 그저께 밤 수면(어제 아침 기상) → record_date = 오늘에서 1일 전.
+                - 학습 데이터나 임의의 과거 연도 날짜를 사용하지 않는다.
                 """
-                        .formatted(today);
+                        .formatted(today, today);
         String merged = systemPrompt == null || systemPrompt.isBlank()
                 ? dateBlock.stripLeading()
                 : systemPrompt + dateBlock;

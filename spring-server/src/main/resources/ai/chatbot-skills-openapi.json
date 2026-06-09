@@ -235,7 +235,8 @@
           "record_date": {
             "type": "string",
             "format": "date",
-            "example": "2026-05-27"
+            "description": "기상일(KST). '어제/어젯밤 수면' 질의 시 오늘 날짜를 사용한다 (어제 취침·오늘 기상).",
+            "example": "2026-05-28"
           }
         }
       },
