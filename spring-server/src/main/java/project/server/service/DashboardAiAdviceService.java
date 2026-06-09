@@ -62,7 +62,7 @@ public class DashboardAiAdviceService {
             return Optional.of(new AiAdviceResult(text.trim(), citations));
         } catch (RuntimeException e) {
             log.warn("[DashboardAiAdviceService] advice generation failed userId={}: {}",
-                    userId, e.getMessage());
+                    userId, e.getMessage(), e);
             return Optional.empty();
         }
     }

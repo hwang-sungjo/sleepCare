@@ -60,9 +60,18 @@ export default function App() {
     const fetchDashboardData = async (token: string) => {
         try {
             const [alarmRes, userRes, dashRes] = await Promise.all([
-                alarmService.getAlarm(token).catch(() => null),
-                userService.getUserProfile(token).catch(() => null),
-                dashboardService.getSleepSummary(token).catch(() => null),
+                alarmService.getAlarm(token).catch((err) => {
+                    console.error('[SleepCare] 알람 조회 실패:', err);
+                    return null;
+                }),
+                userService.getUserProfile(token).catch((err) => {
+                    console.error('[SleepCare] 사용자 프로필 조회 실패:', err);
+                    return null;
+                }),
+                dashboardService.getSleepSummary(token).catch((err) => {
+                    console.error('[SleepCare] sleep-summary 조회 실패:', err);
+                    return null;
+                }),
             ]);
 
             if (alarmRes) {
@@ -72,9 +81,19 @@ export default function App() {
                 if (today) setAlarmTime(today.baseWakeTime);
             }
             if (userRes) setNickname(userRes.nickname);
-            if (dashRes) setDashboardData(dashRes);
-        } catch {
-            // 조회 실패 시 기본값 유지
+            if (dashRes) {
+                setDashboardData(dashRes);
+                if (!dashRes.aiAdvice?.trim()) {
+                    console.warn(
+                        '[SleepCare] aiAdvice가 응답에 없습니다. ' +
+                            'Bedrock/S3 호출 실패 또는 빈 응답일 수 있습니다. ' +
+                            '서버 로그의 [DashboardAiAdviceService]를 확인하세요.',
+                        dashRes
+                    );
+                }
+            }
+        } catch (err) {
+            console.error('[SleepCare] 대시보드 데이터 조회 중 예외:', err);
         }
     };
 
