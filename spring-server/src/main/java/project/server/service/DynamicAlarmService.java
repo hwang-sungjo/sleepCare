@@ -107,13 +107,24 @@ public class DynamicAlarmService {
             return;
         }
 
-        // ③ 수면 단계 목록.
-        // Fitbit은 수면 시작일(취침일)을 record_date로 기록 → 아침 알람 기준 데이터는 어제 날짜에 저장됨.
+        // ③ 수면 단계 목록 (실시간 없으면 최신 기록으로 Fallback 후 날짜 Shift).
         LocalDate today = LocalDate.now(DEFAULT_ZONE);
-        List<SleepStage> stages =
-                sleepStageRepository.findByUserIdAndRecordDateOrderByStartTimeAsc(userId, today.minusDays(1));
-        if (stages.isEmpty()) {
-            stages = sleepStageRepository.findByUserIdAndRecordDateOrderByStartTimeAsc(userId, today);
+        SleepStage latestStage = sleepStageRepository.findFirstByUserIdOrderByRecordDateDesc(userId);
+        
+        List<SleepStage> stages;
+        long daysToShift = 0;
+        
+        if (latestStage != null) {
+            LocalDate latestRecordDate = latestStage.getRecordDate();
+            stages = sleepStageRepository.findByUserIdAndRecordDateOrderByStartTimeAsc(userId, latestRecordDate);
+            
+            // 아침 기상 알람 기준이므로, 취침일(expectedRecordDate)은 '어제' 날짜가 정상입니다.
+            LocalDate expectedRecordDate = today.minusDays(1);
+            daysToShift = java.time.temporal.ChronoUnit.DAYS.between(latestRecordDate, expectedRecordDate);
+            log.debug("[DynamicAlarmService] user={} using sleep data from {}, shifted by {} days", userId, latestRecordDate, daysToShift);
+        } else {
+            stages = java.util.Collections.emptyList();
+            log.debug("[DynamicAlarmService] user={} has no sleep data", userId);
         }
 
         // ④ 수면 품질 점수 → effectiveWindow 결정.
@@ -137,8 +148,9 @@ public class DynamicAlarmService {
                 userId, String.format("%.1f", score), baseWindowMinutes, windowMinutes);
 
         // ⑤~⑥: 얕은 구간 후보 순간 후, now 이후만 남겨 최소 선택. 부재 시 windowEnd.
+        final long finalDaysToShift = daysToShift;
         LocalDateTime chosenAt = stages.stream()
-                .map(s -> clippedShallowWakeCandidate(s, windowStart, windowEnd))
+                .map(s -> clippedShallowWakeCandidateShifted(s, finalDaysToShift, windowStart, windowEnd))
                 .filter(Objects::nonNull)
                 .filter(t -> !t.isBefore(now))
                 .min(Comparator.naturalOrder())
@@ -183,15 +195,10 @@ public class DynamicAlarmService {
 
     /**
      * ⑥ 세그먼트가 [windowStart, windowEnd] 와 교차하고, 레벨이 얕으면 깨어날 후보 시각 하나를 돌린다.
-     *
-     * <p>
-     * 겹침: 닫힌 구간으로 볼 때 교집합이 비어있지 않을 것.
-     * 후보 순간은 요구 명세와 같이 {@code max(segStart, windowStart)} 이나,
-     * 이 값이 교집합의 하단과 일치하도록 교차 여부 검사 후에만 반환한다.
-     * </p>
+     * 과거의 수면 기록을 현재 날짜로 당기기 위해 daysToShift 만큼 더해서 계산한다.
      */
-    private static LocalDateTime clippedShallowWakeCandidate(
-            SleepStage row, LocalDateTime windowStart, LocalDateTime windowEnd) {
+    private static LocalDateTime clippedShallowWakeCandidateShifted(
+            SleepStage row, long daysToShift, LocalDateTime windowStart, LocalDateTime windowEnd) {
         if (row == null || row.getStageLevel() == null) {
             return null;
         }
@@ -200,11 +207,12 @@ public class DynamicAlarmService {
             return null;
         }
 
-        LocalDateTime segStart = row.getStartTime();
-        if (segStart == null) {
+        LocalDateTime origStart = row.getStartTime();
+        if (origStart == null) {
             return null;
         }
 
+        LocalDateTime segStart = origStart.plusDays(daysToShift);
         long durationSec = row.getDurationSeconds() == null ? 0L : row.getDurationSeconds().longValue();
         LocalDateTime segEnd = segStart.plus(Duration.ofSeconds(durationSec));
 

@@ -9,4 +9,5 @@ import java.util.List;
 public interface SleepStageRepository extends JpaRepository<SleepStage, Long> {
 
     List<SleepStage> findByUserIdAndRecordDateOrderByStartTimeAsc(Long userId, LocalDate recordDate);
+    SleepStage findFirstByUserIdOrderByRecordDateDesc(Long userId);
 }

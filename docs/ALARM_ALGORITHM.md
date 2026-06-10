@@ -20,7 +20,7 @@ Fitbit 워치  ──Fitbit API──►  fitbit_to_rds Lambda  ──INSERT─�
                                                        daily_health_summary
                                                                     │
                                               ◄──────  DynamicAlarmService
-                                            알람 재계산 (GET /alarms 호출 시)
+                                    알람 재계산 (기상 1시간 전 자동 스케줄러 OR GET /alarms 호출 시)
 ```
 
 - **`sleep_stage`**: 수면 구간별 단계 타임라인 (deep / light / rem / wake)
@@ -48,7 +48,9 @@ Fitbit 워치  ──Fitbit API──►  fitbit_to_rds Lambda  ──INSERT─�
    YES → dynamic_wake_at = nextWeeklyWakeAt (다음 주 동일 요일) → 종료
          │ NO
          ▼
-4. SleepStage 조회 (record_date = 어제, 없으면 오늘)
+4. 최신 SleepStage 조회 및 시간 맵핑 (Shift)
+   실시간(오늘) 수면 데이터가 없으면 가장 최신 기록을 불러와
+   해당 수면 시간대를 오늘 날짜 기준으로 맵핑(Shift)하여 패턴 유추
          │
          ▼
 5. 수면 점수 계산 → effectiveWindow 결정
@@ -60,18 +62,18 @@ Fitbit 워치  ──Fitbit API──►  fitbit_to_rds Lambda  ──INSERT─�
 6. windowStart = windowEnd - effectiveWindow
          │
          ▼
-7. 각 SleepStage 세그먼트에 대해:
+7. 맵핑된(Shift) 각 SleepStage 세그먼트에 대해:
    deep 포함 → 제외
    light/rem/restless/awake/wake 포함
-     + [segStart, segEnd] ∩ [windowStart, windowEnd] ≠ ∅
-   → 후보 = max(segStart, windowStart)
+     + [맵핑된 segStart, 맵핑된 segEnd] ∩ [windowStart, windowEnd] ≠ ∅
+   → 후보 = max(맵핑된 segStart, windowStart)
          │
          ▼
 8. 후보 중 now 이상인 최솟값 선택
    없으면 → windowEnd (Fallback)
          │
          ▼
-9. dynamic_wake_at 저장 + MQTT 발행
+9. dynamic_wake_at 저장 + MQTT 스케줄 발행 (라즈베리파이 전송)
 ```
 
 ---
@@ -108,6 +110,21 @@ Fitbit 워치  ──Fitbit API──►  fitbit_to_rds Lambda  ──INSERT─�
                  │◄──window──────────────►│
                  │
                  └─ 후보 = max(06:50, 07:00) = 07:00
+```
+
+### 최신 기록 기반 시간 맵핑 (Shift)
+
+Fitbit 데이터는 아침 기상 후에 일괄 업데이트 되는 특성이 있어, 기상 1시간 전 스케줄러가 동작할 시점에는 오늘 밤의 실시간 수면 데이터가 없을 가능성이 높습니다.
+이 한계를 극복하기 위해, **가장 최근의 수면 기록(예: 어젯밤)을 불러와 그 시간대를 오늘 날짜에 맞게 Shift** 합니다.
+
+```
+예시: 오늘(6월 10일) 기상 1시간 전(06:30) 알고리즘 자동 실행
+가장 최신 기록: 6월 8일의 수면 데이터 (6월 9일 기상 시 적재됨)
+
+[과거 기록] 6월 8일 23:00 ~ 6월 9일 07:30 수면
+  → 이 과거의 수면 패턴을 오늘(6월 10일)로 맵핑(Shift: +1일)
+  → [맵핑 후] 6월 9일 23:00 ~ 6월 10일 07:30 수면으로 간주하고,
+    오늘의 탐색 창(07:00~07:30) 내에서 얕은 수면 구간을 예측해냅니다.
 ```
 
 ---
@@ -315,7 +332,7 @@ score = 70 - deepRatio×40 + lightRatio×15 + remRatio×15
 
 | 케이스 | 처리 결과 |
 |---|---|
-| SleepStage가 어제 날짜에 없음 | 오늘 날짜로 재시도, 그래도 없으면 점수=100으로 창 조정 없이 windowEnd |
+| 최신 수면 기록이 전혀 없음 | 점수=100으로 창 조정 없이 windowEnd로 Fallback 설정 |
 | 창 전체가 deep | 후보 없음 → windowEnd (Fallback) |
 | 후보가 now보다 과거 | 필터 제거 → 남은 후보 없으면 windowEnd |
 | adaptive=false | 수면 분석 없이 nearestUpcomingWakeAt 직접 사용 |
@@ -330,6 +347,7 @@ score = 70 - deepRatio×40 + lightRatio×15 + remRatio×15
 |---|---|
 | `service/DynamicAlarmService.java` | 알고리즘 전체 흐름 |
 | `util/SleepQualityEvaluator.java` | 수면 점수 계산 + 창 조정 |
+| `service/AlarmSchedulerTask.java` | 기상 1시간 전 자동 동작 스케줄러 |
 | `util/AlarmWakeAtHelper.java` | 날짜·요일 계산 유틸 |
 | `dao/SleepStageRepository.java` | 수면 단계 조회 |
 | `dao/DailyHealthSummaryRepository.java` | 수면 요약 조회 |

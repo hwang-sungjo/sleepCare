@@ -12,4 +12,6 @@ public interface AlarmRepository extends JpaRepository<AlarmEntity, Long> {
     Optional<AlarmEntity> findByUserIdAndDayOfWeek(long userId, int dayOfWeek);
 
     List<AlarmEntity> findAllByUserIdOrderByDayOfWeekAsc(long userId);
+
+    List<AlarmEntity> findAllByDayOfWeek(int dayOfWeek);
 }
