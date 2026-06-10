@@ -3,10 +3,13 @@ package project.server.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import project.server.dao.AlarmRepository;
+import project.server.dao.DailyHealthSummaryRepository;
 import project.server.dao.SleepStageRepository;
 import project.server.dao.entity.AlarmEntity;
+import project.server.entity.DailyHealthSummary;
 import project.server.entity.SleepStage;
 import project.server.util.AlarmWakeAtHelper;
+import project.server.util.SleepQualityEvaluator;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,6 +75,7 @@ public class DynamicAlarmService {
 
     private final AlarmRepository alarmRepository;
     private final SleepStageRepository sleepStageRepository;
+    private final DailyHealthSummaryRepository dailyHealthSummaryRepository;
     /** 동적 알람 저장 후 브로커로 라즈베리 일정 MQTT 발행까지 담당. lambda 프로파일에서는 빈 없음 → Optional. */
     private final Optional<MqttAlarmPublisher> mqttAlarmPublisher;
 
@@ -84,9 +88,7 @@ public class DynamicAlarmService {
         }
 
         LocalDateTime now = LocalDateTime.now(DEFAULT_ZONE);
-        int windowMinutes = Objects.requireNonNullElse(alarm.getWindowMinutesBefore(), 30);
         LocalDateTime windowEnd = calculateWindowEndLocal(alarm, now);
-        LocalDateTime windowStart = windowEnd.minusMinutes(windowMinutes);
 
         // ① 적응형 비활성: 동적 창 검색 없이 오늘 base 순간만 유지 후 종료.
         if (Boolean.FALSE.equals(alarm.getAdaptiveEnabled())) {
@@ -105,7 +107,7 @@ public class DynamicAlarmService {
             return;
         }
 
-        // ⑤ 수면 단계 목록.
+        // ③ 수면 단계 목록.
         // Fitbit은 수면 시작일(취침일)을 record_date로 기록 → 아침 알람 기준 데이터는 어제 날짜에 저장됨.
         LocalDate today = LocalDate.now(DEFAULT_ZONE);
         List<SleepStage> stages =
@@ -114,7 +116,27 @@ public class DynamicAlarmService {
             stages = sleepStageRepository.findByUserIdAndRecordDateOrderByStartTimeAsc(userId, today);
         }
 
-        // ⑥~⑦: 얕은 구간 후보 순간 후, now 이후만 남겨 최소 선택. 부재 시 windowEnd.
+        // ④ 수면 품질 점수 → effectiveWindow 결정.
+        int baseWindowMinutes = Objects.requireNonNullElse(alarm.getWindowMinutesBefore(), 30);
+        List<DailyHealthSummary> recentSummaries =
+                dailyHealthSummaryRepository.findByUserIdAndRecordDateBetweenOrderByRecordDateAsc(
+                        userId, today.minusDays(7), today.minusDays(1));
+
+        double score;
+        if (!recentSummaries.isEmpty()) {
+            score = SleepQualityEvaluator.computeWeightedScore(recentSummaries);
+        } else if (!stages.isEmpty()) {
+            score = SleepQualityEvaluator.computeFallbackScore(stages);
+        } else {
+            score = 100.0;
+        }
+
+        int windowMinutes = SleepQualityEvaluator.effectiveWindowMinutes(baseWindowMinutes, score);
+        LocalDateTime windowStart = windowEnd.minusMinutes(windowMinutes);
+        log.debug("[DynamicAlarmService] user={} sleepScore={} baseWindow={}m effectiveWindow={}m",
+                userId, String.format("%.1f", score), baseWindowMinutes, windowMinutes);
+
+        // ⑤~⑥: 얕은 구간 후보 순간 후, now 이후만 남겨 최소 선택. 부재 시 windowEnd.
         LocalDateTime chosenAt = stages.stream()
                 .map(s -> clippedShallowWakeCandidate(s, windowStart, windowEnd))
                 .filter(Objects::nonNull)
@@ -122,7 +144,7 @@ public class DynamicAlarmService {
                 .min(Comparator.naturalOrder())
                 .orElse(windowEnd);
 
-        // ⑨ 데모: 계산 결과를 버리고 base − window 분(= windowStart 순간)에 고정한다.
+        // 데모: 계산 결과를 버리고 base − window 분(= windowStart 순간)에 고정한다.
         if (DEMO_FORCE_DYNAMIC_EQUALS_WINDOW_START) {
             chosenAt = windowStart;
         }
