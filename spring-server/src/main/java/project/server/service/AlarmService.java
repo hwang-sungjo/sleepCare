@@ -48,9 +48,9 @@ public class AlarmService {
      */
     public GetAlarmResponse getAlarm(long userId) {
         ensureWeeklyAlarms(userId);
-        dynamicAlarmService.recalculateForUser(userId);
-        List<AlarmEntity> alarms = alarmRepository.findAllByUserIdOrderByDayOfWeekAsc(userId);
         int todayDay = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();
+        dynamicAlarmService.recalculateForUserAndDay(userId, todayDay);
+        List<AlarmEntity> alarms = alarmRepository.findAllByUserIdOrderByDayOfWeekAsc(userId);
         LocalDateTime effective = resolveTodayEffectiveWakeAt(alarms, todayDay);
         return toResponse(alarms, todayDay, effective);
     }
@@ -94,7 +94,7 @@ public class AlarmService {
         }
 
         if (Boolean.TRUE.equals(request.getRecomputeDynamicNow()) && alarm.getDayOfWeek() == todayDow) {
-            dynamicAlarmService.recalculateForUser(userId);
+            dynamicAlarmService.recalculateForUserAndDay(userId, todayDow);
         }
         List<AlarmEntity> alarms = alarmRepository.findAllByUserIdOrderByDayOfWeekAsc(userId);
         int todayDay = LocalDate.now(DEFAULT_ZONE).getDayOfWeek().getValue();

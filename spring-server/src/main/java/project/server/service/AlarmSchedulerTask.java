@@ -31,26 +31,27 @@ public class AlarmSchedulerTask {
     @Transactional
     public void scheduleDynamicAlarms() {
         LocalDateTime now = LocalDateTime.now(DEFAULT_ZONE);
-        int todayDow = now.getDayOfWeek().getValue();
-        LocalTime nowTime = now.toLocalTime().withSecond(0).withNano(0);
+        LocalDateTime targetTime = now.plusHours(1);
+        int targetDow = targetTime.getDayOfWeek().getValue();
+        LocalTime targetLocalTime = targetTime.toLocalTime().withSecond(0).withNano(0);
 
-        List<AlarmEntity> todayAlarms = alarmRepository.findAllByDayOfWeek(todayDow);
-        if (todayAlarms == null || todayAlarms.isEmpty()) {
+        List<AlarmEntity> targetAlarms = alarmRepository.findAllByDayOfWeek(targetDow);
+        if (targetAlarms == null || targetAlarms.isEmpty()) {
             return;
         }
 
-        for (AlarmEntity alarm : todayAlarms) {
+        for (AlarmEntity alarm : targetAlarms) {
             LocalTime baseWakeTime = alarm.getBaseWakeTime();
             if (baseWakeTime == null) {
                 continue;
             }
 
-            LocalTime oneHourBefore = baseWakeTime.minusHours(1).withSecond(0).withNano(0);
+            LocalTime baseTimeTruncated = baseWakeTime.withSecond(0).withNano(0);
             
-            if (nowTime.equals(oneHourBefore)) {
+            if (targetLocalTime.equals(baseTimeTruncated)) {
                 log.info("[AlarmSchedulerTask] Triggering dynamic alarm calculation for user {} 1 hour before baseWakeTime {}", alarm.getUserId(), baseWakeTime);
                 try {
-                    dynamicAlarmService.recalculateForUser(alarm.getUserId());
+                    dynamicAlarmService.recalculateForUserAndDay(alarm.getUserId(), targetDow);
                 } catch (Exception e) {
                     log.error("[AlarmSchedulerTask] Error calculating dynamic alarm for user {}", alarm.getUserId(), e);
                 }
