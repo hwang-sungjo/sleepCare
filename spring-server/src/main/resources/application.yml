@@ -7,6 +7,10 @@ spring:
       "prod": "prodDB, prodPort, secret, web-mvc"
       "lambda": "prodDB, secret, web-mvc"
 
+logging:
+  level:
+    root: DEBUG
+
 ---
 
 spring:
@@ -216,4 +220,3 @@ spring:
         # 부팅 시 DB 연결 없이 dialect 결정 → cold start 단축
         temp:
           use_jdbc_metadata_defaults: false
-
